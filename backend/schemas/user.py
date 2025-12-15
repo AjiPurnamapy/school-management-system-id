@@ -1,8 +1,13 @@
-from sqlmodel import SQLModel, Field
+from sqlmodel import SQLModel
 from typing import Optional
 
 class BaseUser(SQLModel):
-    id: Optional[int] = Field(default=None, primary_key=True)
     name : str
-    age : int
+    age : Optional[int] = None
+
+class UserCreate(BaseUser):
+    password: str
+
+class UserRead(BaseUser):
+    id: int
 

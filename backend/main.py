@@ -24,8 +24,8 @@ app.include_router(auth.router)
 app.include_router(notes.router)
 
 
-@app.get("/user", response_model=List[User])
-def read_user(
+@app.get("/user", response_model=List[BaseUser])
+def read_all_user(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ):
@@ -74,8 +74,3 @@ def delete_user(user_id: int, session: Session = Depends(get_session)):
     session.delete(user_db) # menghapus data sesuai request (user) di database
     session.commit() # menyimpan perubahan
     return {"messege": "data has deleted succsesfully "}
-
-print("-daftaru route")
-for route in app.routes:
-    print(route.path)
-print("___________")

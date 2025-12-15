@@ -1,7 +1,7 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
-
+from schemas.notes import ReadNotes, CreateNotes
 from database import get_session
 from models import Notes, User
 from dependencies import get_current_user
@@ -11,20 +11,21 @@ router = APIRouter(
     tags=["Notes"]      # biar rapi
 )
 
-@router.post("/", response_model=Notes)
+@router.post("/", response_model=ReadNotes)
 def create_notes(
-    note: Notes,
+    notes_input: CreateNotes,
     session: Session = Depends(get_session),
     current_user : User = Depends(get_current_user),
 ):
-    note.owner_id = current_user.id  # membuat paksa owner_id disamakan dengan user_id saat ini
+    notes_db = Notes.model_validate(notes_input)
+    notes_db.owner_id = current_user.id
     
-    session.add(note)
+    session.add(notes_db)
     session.commit()
-    session.refresh(note)
-    return note
+    session.refresh(notes_db)
+    return notes_db
 
-@router.get("/", response_model=List[Notes])
+@router.get("/", response_model=List[ReadNotes])
 def read_my_notes(
     q: Optional[str] = None,
     session: Session = Depends(get_session),
@@ -42,8 +43,8 @@ def read_my_notes(
     result = session.exec(statement).all()
     return result
 
-@router.put("/{notes_id}", response_model=Notes)
-def update_notes(notes_id:int, new_notes:Notes,
+@router.put("/{notes_id}", response_model=ReadNotes)
+def update_notes(notes_id:int, new_notes:CreateNotes,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ):
@@ -55,6 +56,15 @@ def update_notes(notes_id:int, new_notes:Notes,
     if notes_db.owner_id != current_user.id:
         raise HTTPException(status_code=403, detail="youre not allowed")
     
+    notes_db.title = new_notes.title
+    notes_db.content = new_notes.content
+
+    session.add(notes_db)
+    session.commit()
+    session.refresh(notes_db)
+    return notes_db
+
+
 @router.delete("/{notes_id}")
 def delete_notes(
     notes_id :int,
