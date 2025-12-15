@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from routers import notes, auth
 from database import create_db_table, get_session
 from models import User
+from schemas.user import BaseUser
 from dependencies import (
     get_current_user,
     get_password_hash,
@@ -22,6 +23,7 @@ app = FastAPI(lifespan=lifespan)
 app.include_router(auth.router)
 app.include_router(notes.router)
 
+
 @app.get("/user", response_model=List[User])
 def read_user(
     session: Session = Depends(get_session),
@@ -33,7 +35,7 @@ def read_user(
     return result
 
 
-@app.put("/user/{user_id}", response_model= User)
+@app.put("/user/{user_id}", response_model= BaseUser)
 def update_user(user_id: int, new_data: User,
     session: Session = Depends(get_session),
 ):
@@ -57,7 +59,7 @@ def update_user(user_id: int, new_data: User,
     session.add(user_db)        # menyimpan data ke memori python
     session.commit()            # mengirim datanya ke database (menimpa data asli yang ada di database)
     session.refresh(user_db)    # mengambil data yang baru di ubah dari database
-    return user_db              # menampilkan data yg baru saja di ubah ke user
+    return user_db             # menampilkan data yg baru saja di ubah ke user
 
 
 @app.delete("/user/{user_id}")

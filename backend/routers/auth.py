@@ -1,15 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel import Session, select
-
 from database import get_session
+from schemas.user import BaseUser
 from models import User
 from dependencies import get_password_hash, verify_password, create_acces_token, get_current_user
 
 router = APIRouter(tags=["Authentication"])
 
-@router.post("/user", response_model=User)
-def create_user(user: User, session: Session = Depends(get_session)):
+@router.post("/user", response_model=BaseUser)
+async def create_user(user: User, session: Session = Depends(get_session)):
     # hash password dan timpa password asli dengan yang sudah diacak
     user.password = get_password_hash(user.password)
 
@@ -40,6 +40,6 @@ def login_for_acces_token(
     return {"access_token": access_token, "token_type": "bearer"}
 
 # endpoint khusus data pribadi user
-@router.get("/myprofile", response_model=User)
+@router.get("/myprofile", response_model=BaseUser)
 def check_my_profile(current_user : User = Depends(get_current_user)):
     return current_user
