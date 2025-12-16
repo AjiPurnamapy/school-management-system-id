@@ -1,17 +1,23 @@
+import os
+from dotenv import load_dotenv
 from datetime import datetime, timedelta, timezone # untuk menambahkan waktu dan batas waktu
-from typing import Annotated, Optional
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer  # Untuk form login
+from fastapi.security import OAuth2PasswordBearer  # Untuk form login
 from sqlmodel import Session, select
 from passlib.context import CryptContext    # untuk mengubah password
 from jose import JWTError, jwt 
 from database import get_session
 from models import User
 
+load_dotenv()
+
 # konfigurasi keamanan dan kunci rahasia
-SECRET_KEY = "developer_ganteng_suaminya_waguri"
-ALGORITHM = "HS256"
-ACCES_TOKEN_EXPIRE_MINUTES = 30  # batas waktu penggunaan token (menit)
+SECRET_KEY = os.getenv("SECRET_KEY")
+ALGORITHM = os.getenv("ALGORITHM")
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 30)) # batas waktu penggunaan token (menit)
+
+if not SECRET_KEY:
+    raise ValueError("FATAL ERROR: SECRET_KEY tidak ditemukan di file .env!")
 
 # konfigurasi dan seting agar menggunakan algoritma bcrypt
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -25,7 +31,7 @@ def verify_password(plain_password, hashed_password):
 
 def create_acces_token(data: dict):
     to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCES_TOKEN_EXPIRE_MINUTES)
+    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt

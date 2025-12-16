@@ -24,7 +24,7 @@ app.include_router(auth.router)
 app.include_router(notes.router)
 
 
-@app.get("/user", response_model=List[BaseUser])
+@app.get("/user", response_model=List[User])
 def read_all_user(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
