@@ -1,5 +1,5 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select
 from schemas.notes import ReadNotes, CreateNotes
 from database import get_session
@@ -29,18 +29,15 @@ def create_notes(
 
 @router.get("/", response_model=List[ReadNotes])
 def read_my_notes(
-    q: Optional[str] = None,
+    offset : int = 0,       # default: mulai dari awal
+    limit : int = Query(default=10, le=100),     # default: 10 data, maksimal 100 data
     session: Session = Depends(get_session),
     current_user : User = Depends(get_current_user),
 ):
     # set untuk menampilkan yg hanya milik user
     statement = select(Notes).where(Notes.owner_id == current_user.id)
 
-    # cari berdasarkan judul atau isi
-    if q:
-        statement = statement.where(
-            (Notes.title.contains(q)) | (Notes.content.contains(q))
-        )
+    statement = statement.offset(offset).limit(limit)
 
     result = session.exec(statement).all()
     return result
