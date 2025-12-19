@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select
 from schemas.notes import ReadNotes, CreateNotes

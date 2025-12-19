@@ -1,5 +1,6 @@
 from typing import List
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Request, status
+from fastapi.responses import JSONResponse
 from sqlmodel import Session, select
 from contextlib import asynccontextmanager
 
@@ -22,6 +23,20 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 app.include_router(auth.router)
 app.include_router(notes.router)
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    # log error nya hanya bisa dilihat programer
+    print(f"FATAL ERROR TERJADI: {exc}")
+
+    # response ke user
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={
+            "status": "fail",
+            "message": "terjadi kesalahan internal pada server. silahkan coba lagi nanti."
+        },
+    )
 
 @app.get("/user", response_model=List[User])
 def read_all_user(
