@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 
 # mengambil 'bagian' dari file yang ingin
 from routers import notes, auth
-from database import create_db_table, get_session
+from database import get_session
 from models import User
 from schemas.user import BaseUser
 from dependencies import (
@@ -17,7 +17,7 @@ from dependencies import (
 # Lifespan: jalan otomatis saat server nyala
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    create_db_table()      # perintah: "buat semua tabel yg di-import"
+    # create_db_table()      # perintah: "buat semua tabel yg di-import"
     yield
 
 app = FastAPI(lifespan=lifespan)
