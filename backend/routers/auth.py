@@ -4,7 +4,7 @@ from sqlmodel import Session, select
 from backend.database import get_session
 from schemas.user import UserCreate, UserRead
 from models import User
-from dependencies import get_password_hash, verify_password, create_acces_token, get_current_user
+from dependencies import get_password_hash, verify_password, create_access_token, get_current_user
 
 router = APIRouter(tags=["Authentication"])
 
@@ -43,7 +43,7 @@ def login_for_access_token(
             headers={"WWW-Authenticate": "Bearer"},
         )
     # jika lolos, buatkan token
-    access_token = create_acces_token(data={"sub": user.name})
+    access_token = create_access_token(data={"sub": user.name})
     return {"access_token": access_token, "token_type": "bearer"}
 
 # endpoint khusus data pribadi user
