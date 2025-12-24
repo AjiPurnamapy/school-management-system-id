@@ -1,7 +1,7 @@
 from sqlmodel import SQLModel
 
 class BaseNotes(SQLModel):
-    title   : str
+    title  : str 
     content: str
 
 class CreateNotes(BaseNotes):

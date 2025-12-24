@@ -8,10 +8,14 @@ from backend.dependencies import get_current_user
 
 router = APIRouter(
     prefix="/notes",    # semua URl diisi otomatis depannya/catatan
-    tags=["Notes"]      # biar rapi
+    tags=["Notes Management"],      # biar rapi
 )
 
-@router.post("/", response_model=ReadNotes)
+@router.post("/",
+    response_model=ReadNotes,
+    summary="Buat Catatan Baru",
+    description="Endpoint ini menerima judul dan isi catatan, wajib menyertakan token JWT di header",
+)
 def create_notes(
     notes_input: CreateNotes,
     session: Session = Depends(get_session),
@@ -27,7 +31,11 @@ def create_notes(
     session.refresh(notes_db)
     return notes_db
 
-@router.get("/", response_model=List[ReadNotes])
+@router.get("/",
+    response_model=List[ReadNotes],
+    summary="Melihat Catatan",
+    description="Endpoint ini untuk melihat catatan yang telah dibuat, dan dibatasi 100 pencarian catatan per halaman",
+)
 def read_my_notes(
     offset : int = 0,       # default: mulai dari awal
     limit : int = Query(default=10, le=100),     # default: 10 data, maksimal 100 data
@@ -42,7 +50,12 @@ def read_my_notes(
     result = session.exec(statement).all()
     return result
 
-@router.put("/{notes_id}", response_model=ReadNotes)
+@router.put(
+    "/{notes_id}",
+    response_model=ReadNotes,
+    summary="Update Catatan",
+    description="Endpoint ini untuk mengupdate catatan yang diinginkan berdasarkan id catatan-nya"
+)
 def update_notes(notes_id:int, new_notes:CreateNotes,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
@@ -64,7 +77,10 @@ def update_notes(notes_id:int, new_notes:CreateNotes,
     return notes_db
 
 
-@router.delete("/{notes_id}")
+@router.delete("/{notes_id}",
+    summary="Hapus Catatan",
+    description="Endpoint ini khusus untuk menghapus catatan yang diinginkan berdasarkan id catatan-nya",
+)
 def delete_notes(
     notes_id :int,
     session: Session = Depends(get_session),
