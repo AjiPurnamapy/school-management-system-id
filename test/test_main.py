@@ -61,7 +61,7 @@ def test_create_user():
     payload = {
         "email": "ajip23@gmail.com",
         "name": "aji_tes_buat",
-        "age": 24,
+        "age": 21,
         "password": "ajipurnama123"
     }
 
@@ -87,7 +87,7 @@ def test_login_user():
     setup_payload = {
         "email": "ajip234@gmail.com",
         "name": "aji_tes_login",
-        "age": 21,
+        "age": 23,
         "password": "ajipurnama123"
     }
     client.post("/register", json=setup_payload)
@@ -107,3 +107,45 @@ def test_login_user():
     print("\nRESPONSE LOGIN:", response.json())
     assert response.status_code == 200
     assert "access_token" in response.json()
+
+# skenario 4 CRUD notes
+def test_create_notes():
+    # register user khusus tes notes
+    user_payload = {
+        "email": "penulis@gmail.com",
+        "name": "si_penulis",
+        "age": 24,
+        "password": "password123"
+    }
+    client.post("/register", json=user_payload)
+
+    # login untuk dapat token, AGAIN!!!
+    login_payload = {
+        "username": "si_penulis",
+        "password": "password123"
+    }
+    #login pakai form data sesuai aturan FastAPI
+    login_response = client.post("/token", data=login_payload)
+
+    # ambil token dari response json
+    token = login_response.json()["access_token"]
+
+    # create note,  pastikan ada (header authorization) tanpa ini server error 401
+    headers = {
+        "Authorization": f"Bearer {token}"
+    }
+
+    # siapkan data yg akan dimasukkan ke notes
+    note_payload = {
+        "title": "Aku programer",
+        "content": "percobaan pertama"
+    }
+    response = client.post("/notes", json=note_payload, headers=headers)
+
+    print("\nResponse Notes", response.json())
+    # validasi (assert)
+    assert response.status_code==200
+
+    data = response.json()
+    assert data["title"] == "Aku programer"
+    assert "id" in data

@@ -6,10 +6,20 @@ from fastapi.security import OAuth2PasswordBearer  # Untuk form login
 from sqlmodel import Session, select
 from passlib.context import CryptContext    # untuk mengubah password
 from jose import JWTError, jwt 
-from database import get_session
-from models import User
+from backend.database import get_session
+from backend.models import User
+from pathlib import Path
 
-load_dotenv()
+# cari lokasi file ini (dependencies.py) berada
+current_file_path = Path(__file__).resolve()
+
+# mundur 2 langkah untuk dapat folder root (BELAJAR-BACKEND)
+project_root = current_file_path.parent.parent
+
+# gabungkan dengan file .env
+env_path = project_root / ".env"
+
+load_dotenv(dotenv_path=env_path)
 
 # konfigurasi keamanan dan kunci rahasia
 SECRET_KEY = os.getenv("SECRET_KEY")

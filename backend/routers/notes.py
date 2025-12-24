@@ -1,10 +1,10 @@
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select
-from schemas.notes import ReadNotes, CreateNotes
-from database import get_session
-from models import Notes, User
-from dependencies import get_current_user
+from backend.schemas.notes import ReadNotes, CreateNotes
+from backend.database import get_session
+from backend.models import Notes, User
+from backend.dependencies import get_current_user
 
 router = APIRouter(
     prefix="/notes",    # semua URl diisi otomatis depannya/catatan

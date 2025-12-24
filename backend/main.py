@@ -5,11 +5,11 @@ from sqlmodel import Session, select
 from contextlib import asynccontextmanager
 
 # mengambil 'bagian' dari file yang ingin
-from routers import notes, auth
-from database import get_session
-from models import User
-from schemas.user import BaseUser
-from dependencies import (
+from backend.routers import notes, auth
+from backend.database import get_session
+from backend.models import User
+from backend.schemas.user import BaseUser
+from backend.dependencies import (
     get_current_user,
     get_password_hash,
 )
