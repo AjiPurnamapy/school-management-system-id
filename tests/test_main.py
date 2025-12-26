@@ -1,4 +1,6 @@
 from backend.main import app
+from backend.models import User
+from sqlmodel import select, Session
 
 # skenario 1 cek health
 def test_read_root(client):
@@ -36,14 +38,20 @@ def test_create_user(client):
     assert "password" not in data # pastikan agar password tidak dikembalikan ke user(security)
 
 # skenario 3 cek token login akses
-def test_login_user(client):
+def test_login_user(client, session: Session):
     # register usernya biar ada di database dan harus beda email dan name-nya
     client.post("/register", json={
         "email": "ajip234@gmail.com",
         "name": "aji_tes_login",
         "age": 23,
-        "password": "ajipurnama123"
+        "password": "ajipurnama123",
+        "is_active": True
     })
+
+    user = session.exec(select(User).where(User.email == "ajip234@gmail.com")).first()
+    user.is_active = True
+    session.add(user)
+    session.commit()
 
     # siapkan payload login
     # key-nya harus "username" (karena aturan FastAPI)

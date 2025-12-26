@@ -1,63 +1,18 @@
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
-from sqladmin import Admin, ModelView
-from sqladmin.authentication import AuthenticationBackend
-from starlette.requests import Request
-from starlette.responses import RedirectResponse
-
-# mengambil 'bagian' dari file yang ingin
 from backend.routers import notes, auth
 from backend.database import engine
-from backend.models import User, Note
+from backend.admin import setup_admin
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from backend.limiter import limiter
 
 # Lifespan: jalan otomatis saat server nyala
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # create_db_table()      # perintah: "buat semua tabel yg di-import"
     yield
-
-class AdminAuth(AuthenticationBackend):
-    async def login(self, request: Request) -> bool:
-        form = await request.form()
-        username = form.get("username")
-        password = form.get("password")
-        
-        # validasi manual
-        if username == "admin" and password == "admin123":
-            # simpan tiker di session
-            request.session.update({"token": "admin_token_valid"})
-            return True
-        return False
-    
-    async def logout(self, request: Request) -> bool:
-        # hapus tiket dari session
-        request.session.clear()
-        return True
-    
-    async def authenticate(self, request: Request) -> bool:
-        token = request.session.get("token")
-        if not token:
-            return False
-        return True
-    
-# inisialisasi keamanan (kunci untuk session browser)
-authentication_backend = AdminAuth(secret_key="KUNCI_RAHASIA_AKSES_ADMIN_SESSION")
-
-
-class UserAdmin(ModelView, model=User):
-    column_list = [User.id, User.email, User.name, User.age]  # field (kolom) yang ingin di tampilkan
-    can_create = True
-    can_delete = True
-    can_edit = True
-    icon = "fa-solid fa-user"  # untuk ikon
-
-class NotesAdmin(ModelView, model=Note):
-    column_list = [Note.id, Note.title, Note.content, Note.owner_id]
-    can_create = True
-    can_edit = True
-    can_delete = True
-    icon = "fa-solid fa-book"
 
 app = FastAPI(
     title="Notes API Service",
@@ -66,12 +21,18 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# pasang state limiter ke app
+app.state.limiter = limiter
+
+# pasang penanganan error (agar jika limit habis muncul pesan jelas)
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# sambungkan jalur router ke app
 app.include_router(auth.router)
 app.include_router(notes.router)
 
-admin = Admin(app, engine, authentication_backend=authentication_backend)
-admin.add_view(UserAdmin)
-admin.add_view(NotesAdmin)
+# pasang admin panel
+setup_admin(app, engine)
 
 @app.get("/")
 def read_root():
