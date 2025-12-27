@@ -1,5 +1,6 @@
 import logging
 from fastapi import FastAPI, Request, status
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
@@ -87,5 +88,29 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={
             "status": "fail",
             "message": "terjadi kesalahan internal pada server. silahkan coba lagi nanti."
+        },
+    )
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handlers(request: Request, exc: RequestValidationError):
+    # ambil list error mentah
+    errors = exc.errors()
+
+    # buat list pesan yg rapi
+    error_messages = []
+    for e in errors:
+        # ambil nama field (misal: "age", "title")
+        field = e["loc"][-1]
+        message = e["msg"]
+        error_messages.append(f"{field}: {message}")
+
+    logger.warning(f"validasi Gagal: {error_messages}")
+
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content = {
+            "status":"fail",
+            "message":"Data yang dikirimkan tidak valid",
+            "errors":error_messages # hasil error yg sudah di rapihkan
         },
     )
