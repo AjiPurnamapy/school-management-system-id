@@ -1,6 +1,4 @@
-import os
 import logging
-from dotenv import load_dotenv
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request, BackgroundTasks
 from fastapi.security import OAuth2PasswordRequestForm
@@ -15,6 +13,7 @@ from backend.schemas.token import Token
 from backend.models import User
 from backend.limiter import limiter
 from backend.email import send_verification_email
+from backend.utils.templates import get_error_html, get_success_html
 from backend.dependencies import (
     get_password_hash,
     verify_password,
@@ -26,10 +25,6 @@ from backend.dependencies import (
 # Setup logging
 logger = logging.getLogger(__name__)
 
-# Load environment variables
-load_dotenv()
-DOMAIN = os.getenv("DOMAIN", "http://127.0.0.1:8000")
-
 router = APIRouter(tags=["Authentication"])
 
 @router.post("/register", response_model=UserRead)
@@ -38,7 +33,6 @@ async def create_user(
     background_tasks: BackgroundTasks,
     session: Session = Depends(get_session),
 ):
-    """Register a new user and send verivication email"""
     # konversi dari UserCreate (schema) ke User (model database)
     user_db = User.model_validate(user_input)
     # hash password dan timpa password asli dengan yang sudah diacak
@@ -63,13 +57,15 @@ async def create_user(
             verify_token
         )
         logger.info(f"New user registered: {user_db.name} ({user_db.email})")
-        return user_db              # menampilkan data ke user
+        return user_db              
+    
     except IntegrityError:
         session.rollback()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Username atau Email sudah terdaftar"
         )
+    
     except Exception as e:
         session.rollback()
         logger.error(f"Error registration: {str(e)}")
@@ -85,75 +81,63 @@ def verify_email(token: str, session: Session = Depends(get_session)):
         # Deskripsi token
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         email = payload.get("sub")
-        if email is None:
-            return HTMLResponse(content="<h1 style='color:red; text-align:center;'>Error: Token Tidak Valid</h1>", status_code=400)
-    except JWTError:
-        return HTMLResponse(content="<h1 style='color:red; text-align:center;'>Error: Token Kadaluarsa / Rusak </h1>", status_code=400)
+        token_type = payload.get("type")
+
+        # validasi token type untuk keamanan
+        if email is None or token_type != "email_verification":
+            logger.warning("Invalid Verification token attemted")
+            return HTMLResponse(
+                content= get_error_html ("Token tidak valid"),
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+    except JWTError as e:
+        logger.warning(f"JWT error during verification: {str(e)}")
+        return HTMLResponse(
+            content= get_error_html ("Token Kadaluarsa atau rusak"),
+            status_code=status.HTTP_400_BAD_REQUEST
+        )
     
     # cari user berdasarkan email dari token
     statement = select(User).where(User.email == email)
     user = session.exec(statement).first()
 
     if not user:
-        return HTMLResponse(content="<h1 style='color:red; text-align:center;'>Token Tidak Ditemukan</h1>", status_code=404)
-
-    if not user.is_active:
+        logger.warning(f"Verification attemted for non-existent email: {email}")
+        return HTMLResponse(
+            content= get_error_html("User tidak ditemukan"),
+            status_code=status.HTTP_404_NOT_FOUND
+        )
+    
+    # cek apakah user sudah aktif sebelumnya
+    if user.is_active:
+        logger.info(f"User already verified: {user.email}")
+        return HTMLResponse(
+            content= get_success_html(
+                "Akun Sudah Aktif",
+                "Akun Kamu sudah diverifikasi sebelumnya. silahkan login."
+            ),
+            status_code=status.HTTP_200_OK
+        )
+    try:
         user.is_active = True
         session.add(user)
         session.commit()
+        logger.info(f"User verified successfully: {user.email}")
 
-    # Tampilan halaman sukses html
-    html_content = """
-    <!DOCTYPE html>
-    <html>
-        <head>
-            <title>Verifikasi Sukses</title>
-            <style>
-                body{
-                    font-family:Arial, sans-serif;
-                    display: flex;
-                    flex-direction: column;
-                    align-items: center;
-                    justify-content: center;
-                    height: 100vh;
-                    background-color: #f4f4f9;
-                    margin: 0;
-                }
-                .container {
-                    background: white;
-                    padding: 40px;
-                    border-radius: 10px;
-                    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-                    text-align: center;
-                }
-                h1 {color: #4CAF50;}
-                p {color: #555; font-size: 18px;}
-                .btn {
-                    margin-top: 20px;
-                    display: inline-block;
-                    background-color: #4CAF50;
-                    color: white;
-                    padding: 12px 25px;
-                    text-decoration: none;
-                    border-radius: 5px;
-                    font-weight: bold;
-                    transition: background 0.3s;
-                }
-                .btn:hover {background-color: #45a049; }
-            </style>
-        </head>
-        <body>
-            <div class="container">
-            <h1>Verifikasi Berhasil! </h1>
-            <p>Akun kamu sekarang sudah aktif.</p>
-            <p>Silahkan kembali ke aplikasi untuk login</p>
-            <a href="http://127.0.0.1:8000/docs" class="btn">Masuk ke Aplikasi</a>
-            </div>
-        </body>
-    </html>
-    """
-
-    return HTMLResponse(content=html_content, status_code=200)
+        return HTMLResponse(
+            content= get_success_html(
+                "Verifikasi Berhasil!",
+                "Akun Kamu sekarang sudah aktif. silahkan kembali ke aplikasi untuk login."
+            ),
+            status_code=status.HTTP_200_OK
+        )
+    except Exception as e:
+        session.rollback()
+        logger.error(f"Error activating user {email} : {str(e)}")
+        return HTMLResponse(
+            content= get_error_html("Terjadi kesalahan sistem"),
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 @router.post("/token", response_model=Token)
 @limiter.limit("5/minute")
@@ -176,12 +160,16 @@ def login_for_access_token(
     
     # cek apakah user sudah terverifikasi
     if not user.is_active:
+        logger.warning(f"Unverified user attemted login : {user.name}")
         raise HTTPException(
-            status_code=400,
+            status_code=status.HTTP_403_FORBIDDEN,
             detail="Email Belum Terverifikasi. Cek inbox email kamu sekarang juga untuk aktivasi"
         )
-    # jika lolos, buatkan token
-    access_token = create_access_token(data={"sub": user.name})
+    # jika lolos, buatkan token dengan type identifier
+    access_token = create_access_token(
+        data={"sub": user.name, "type":"access"}
+    )
+    logger.info(f"User Logged in successfully: {user.name}")
     return {"access_token": access_token, "token_type": "bearer"}
 
 # endpoint khusus data pribadi user
