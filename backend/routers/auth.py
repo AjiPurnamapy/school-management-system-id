@@ -1,8 +1,13 @@
+import os
+import logging
+from dotenv import load_dotenv
+
 from fastapi import APIRouter, Depends, HTTPException, status, Request, BackgroundTasks
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel import Session, select
 from jose import jwt, JWTError
 from fastapi.responses import HTMLResponse
+from sqlalchemy.exc import IntegrityError
 
 from backend.database import get_session
 from backend.schemas.user import UserCreate, UserRead
@@ -18,41 +23,60 @@ from backend.dependencies import (
     ALGORITHM,
     SECRET_KEY
 )
+# Setup logging
+logger = logging.getLogger(__name__)
+
+# Load environment variables
+load_dotenv()
+DOMAIN = os.getenv("DOMAIN", "http://127.0.0.1:8000")
 
 router = APIRouter(tags=["Authentication"])
 
 @router.post("/register", response_model=UserRead)
-def create_user(
+async def create_user(
     user_input: UserCreate,
     background_tasks: BackgroundTasks,
     session: Session = Depends(get_session),
 ):
-    # cek username kembar
-    existing_user = session.exec(select(User).where(User.name ==user_input.name)).first()
-    if existing_user:
-        raise HTTPException(status_code=400, detail="username sudah dipakai")
-    
-    # cek email kembar (wajib, verifkasi via email)
-    existing_email = session.exec(select(User).where(User.email == user_input.email)).first()
-    if existing_email:
-        raise HTTPException(status_code=400, detail="Email sudah terdaftar")
-    
+    """Register a new user and send verivication email"""
     # konversi dari UserCreate (schema) ke User (model database)
     user_db = User.model_validate(user_input)
     # hash password dan timpa password asli dengan yang sudah diacak
     user_db.password = get_password_hash(user_input.password)
     user_db.is_active = False
 
-    session.add(user_db)        # menyimpan data ke memori python
-    session.commit()            # mengirim datanya ke database
-    session.refresh(user_db)    # mengambil data yang tadi dari database
+    try:
+        session.add(user_db)        # menyimpan data ke memori python
+        session.commit()            # mengirim datanya ke database
+        session.refresh(user_db)    # mengambil data yang tadi dari database
 
-    # buat token verifikasi (beda dengan token login)
-    verify_token = create_access_token(data={"sub": user_db.email})
-    # kirim email
-    background_tasks.add_task(send_verification_email, user_db.email, user_db.name, verify_token)
+        # buat token verifikasi (beda dengan token login)
+        verify_token = create_access_token(
+            data={"sub": user_db.email, "type" : "email_verification"}
+        )
 
-    return user_db              # menampilkan data ke user
+        # kirim email
+        background_tasks.add_task(
+            send_verification_email,
+            user_db.email,
+            user_db.name,
+            verify_token
+        )
+        logger.info(f"New user registered: {user_db.name} ({user_db.email})")
+        return user_db              # menampilkan data ke user
+    except IntegrityError:
+        session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username atau Email sudah terdaftar"
+        )
+    except Exception as e:
+        session.rollback()
+        logger.error(f"Error registration: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Terjadi kesalahan pada sistem"
+        )
 
 # endpoint khusus verifikasi
 @router.get("/verify", response_class=HTMLResponse)
