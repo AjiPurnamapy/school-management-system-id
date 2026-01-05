@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Authentication"])
 
 @router.post("/register", response_model=UserRead)
-async def create_user(
+def create_user(
     user_input: UserCreate,
     background_tasks: BackgroundTasks,
     session: Session = Depends(get_session),
@@ -50,12 +50,12 @@ async def create_user(
         )
 
         # kirim email
-        background_tasks.add_task(
-            send_verification_email,
-            user_db.email,
-            user_db.name,
-            verify_token
-        )
+        # background_tasks.add_task(
+        #     send_verification_email,
+        #     user_db.email,
+        #     user_db.name,
+        #     verify_token
+        # )
         logger.info(f"New user registered: {user_db.name} ({user_db.email})")
         return user_db              
     

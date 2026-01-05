@@ -1,0 +1,47 @@
+version: "3.8"
+
+services:
+  # service database (postgresql)
+  db:
+    image: postgres:15
+    restart: always
+    volumes:
+      # agar data tidak hilang saat container dimatikan
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password123
+      - POSTGRES_DB=notes_db
+    ports:
+      - "5432:5432"
+
+  # Service backend
+  backend:
+    build: .
+    restart: always
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      # dengan ini kodingan di laptop/pc langsung singkron ke dalam container
+      - .:/app
+    ports:
+      - "8000:8000"
+    environment:
+      # Host database bukan 'localhost', tapi 'db' (sesuai nama servie di atas)
+      - DATABASE_URL=postgresql://postgres:password123@db:5432/notes_db
+
+      # inject variabel env lain di sini (pengganti file .env yg kita ignore)
+      - SECRET_KEY=aku_sdqsoor21@!#_wdkklsla_adwAWD23$$dwa_21213324##$@_adwnnajjwd_nwndnsjjawdjn_0)AW@**
+      - ALGORITHM=HS256
+      - ACCESS_TOKEN_EXPIRE_MINUTES=30
+    depends_on:
+      - db # backend baru jalan kalau DB sudah siap
+
+  adminer:
+    image: adminer
+    restart: always
+    ports:
+      - "8080:8080"
+
+# tempat penyimpanan data database (supaya permanen)
+volumes:
+  postgres_data:

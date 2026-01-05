@@ -9,17 +9,22 @@ from alembic import context
 # access to the values within the .ini file in use.
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-
 root_path = os.path.dirname(os.path.dirname(__file__))
 backend_path = os.path.join(root_path, "backend")
-
 sys.path.insert(0, backend_path)
+
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
 from sqlmodel import SQLModel
 from backend.models import *
-
 config = context.config
+
+# untuk baca DATABASE_URL dari docker
+docker_db_url = os.getenv("DATABASE_URL")
+
+if docker_db_url:
+    # timpa konfigurasi sqlalchem.url
+    config.set_main_option("sqlalchemy.url", docker_db_url)
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)

@@ -1,0 +1,18 @@
+# Sampah Python & Environment Lokal
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+
+# Git
+.git/
+.gitignore
+
+*.db
+*.sqlite
+
+# File VS Code
+.vscode/

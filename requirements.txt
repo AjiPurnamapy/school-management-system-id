@@ -3,7 +3,7 @@ alembic
 annotated-doc
 annotated-types
 anyio
-bcrypt>=4.0.1
+bcrypt==3.2.2
 blinker
 certifi
 cffi
