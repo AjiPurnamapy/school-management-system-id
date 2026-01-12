@@ -16,7 +16,6 @@ ecdsa
 email-validator
 fastapi
 fastapi-mail
-Flask
 greenlet
 h11
 httpcore
@@ -53,6 +52,5 @@ starlette
 typing-inspection
 typing_extensions
 uvicorn
-Werkzeug
 wrapt
 WTForms
