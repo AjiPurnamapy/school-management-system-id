@@ -1,3 +1,4 @@
+# ... imports (keeping existing ones)
 import logging
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -15,9 +16,22 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from backend.limiter import limiter
 from backend.admin import SECRET_KEY_ADMIN
+import os
+from pathlib import Path
 
-# konfigurasi Logging, mengganti dari "print" menjadi "logging"
-# mulai sekarang pakai logging.info bukan print
+# ==========================================
+# 1. SETUP FOLDER PENYIMPANAN GAMBAR
+# ==========================================
+# Kita menggunakan "Absolute Path" (Alamat Mutlak) agar komputer tidak bingung
+# mencari folder gambar, tidak peduli dari folder mana terminal dijalankan.
+BASE_DIR = Path(__file__).resolve().parent  # Mencari alamat folder tempat file ini berada
+STATIC_DIR = os.path.join(BASE_DIR, "static") # Menunjuk ke folder 'static'
+IMAGES_DIR = os.path.join(STATIC_DIR, "images") # Menunjuk ke folder 'static/images'
+
+# Buat folder jika belum ada (agar tidak error saat pertama kali dijalankan)
+os.makedirs(IMAGES_DIR, exist_ok=True)
+
+# konfigurasi Logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
@@ -25,38 +39,43 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Lifespan: jalan otomatis saat server nyala
+# Lifespan
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("🚀 Server Sedang Menyala...")
-    # create_db_table()      # perintah: "buat semua tabel yg di-import"
     logger.info("🛑 Server dimatikan.")
     yield
 
 app = FastAPI(
     title="Notes API Service",
-    description="""
-    API Backend Untuk Aplikasi Manajemen Catatan Pribadi.
-
-    Fitur utama:
-    * 🔐 Auth JWT (Login & Register)
-    * 📝 CRUD Notes (Create, Read, Update, Delete)
-    * 📧 Email Notification (Background Task)
-    * 🛡️  Rate Limiter (Mencegah spam)
-    """,
+    description="API Backend Untuk Aplikasi Manajemen Catatan Pribadi.",
     version="1.0.0",
-    contact={
-        "Name":"Aji Purnamapy",
-        "email":"ajipurnama798@gmail.com",
-    },
     lifespan=lifespan
 )
 
+# ==========================================
+# 2. HUBUNGKAN FOLDER GAMBAR KE INTERNET
+# ==========================================
+# 'Mount' artinya kita membuka akses folder ini ke publik.
+# Jadi jika user membuka 'http://localhost:8000/static/foto.jpg',
+# server akan mengambil file 'foto.jpg' dari folder STATIC_DIR di laptop kita.
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+# ==========================================
+# 3. DAFTAR TAMU YANG DIIZINKAN (CORS)
+# ==========================================
+# CORS adalah satpam browser. Kita harus mencatat siapa saja yang boleh
+# "berbicara" dengan backend ini.
 origin = [
-    "http://127.0.0.1:5500", # live server VScode biasanya menggunakan port ini 
-    "http://localhost:5500", # live server VScode biasanya menggunakan port ini 
-    "http://localhost:3000", # react default port 
+    "http://127.0.0.1:5500", 
+    "http://localhost:5500", 
+    "http://localhost:3000",
     "http://localhost:8000",
+    
+    # PENTING: Ini alamat Frontend React kita.
+    # Jika tidak dimasukkan, Login akan gagal (diblokir).
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
 ]
 
 app.add_middleware(

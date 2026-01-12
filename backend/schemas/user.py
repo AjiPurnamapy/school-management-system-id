@@ -30,4 +30,5 @@ class UserCreate(BaseUser):
     
 class UserRead(BaseUser):
     id: int
+    profile_image: Optional[str] = None
 

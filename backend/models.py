@@ -8,6 +8,7 @@ class User(SQLModel, table=True):
     age      : int
     password : str
     is_active: bool = Field(default=False)
+    profile_image: Optional[str] = Field(default=None)
 
 class Note(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)

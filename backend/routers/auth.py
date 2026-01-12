@@ -1,5 +1,9 @@
 import logging
+import shutil    # shutil: Untuk menyalin file (copy file)
+import uuid     # uuid: Untuk membuat nama file acak yang unik (agar tidak bentrok)
+import os
 
+from fastapi import UploadFile, File    # UploadFile, File: Tipe data khusus dari FastAPI untuk menangkap file upload
 from fastapi import APIRouter, Depends, HTTPException, status, Request, BackgroundTasks
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel import Session, select
@@ -49,7 +53,7 @@ def create_user(
             data={"sub": user_db.email, "type" : "email_verification"}
         )
 
-        # kirim email
+        # kirim email, uncommet jika nanti mau deploy
         # background_tasks.add_task(
         #     send_verification_email,
         #     user_db.email,
@@ -176,3 +180,42 @@ def login_for_access_token(
 @router.get("/myprofile", response_model=UserRead)
 def check_my_profile(current_user : User = Depends(get_current_user)):
     return current_user
+
+
+@router.post("/upload-photo")
+async def upload_photo(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session)
+):
+    # Kita harus memastikan file yang dikirim benar-benar gambar.
+    if file.content_type not in ["image/jpeg", "image/png"]:
+        raise HTTPException(status_code=400, detail="Hanya boleh file JPG atau PNG")
+    
+    # Jika 1000 user upload file bernama "foto.jpg", file lama akan tertimpa.
+    # Solusinya: Kita ganti namanya dengan kode acak (UUID).
+    # Contoh: "1_a62f8... .jpg"
+    file_extension = file.filename.split(".")[-1]
+    unique_filename = f"{current_user.id}_{uuid.uuid4()}.{file_extension}"
+    file_location = f"backend/static/images/{unique_filename}"
+    
+    # SIMPAN FILE FISIK (Writing to Disk)
+    # File dari frontend datang berupa aliran data (stream).
+    # Kita harus menulis aliran tersebut ke file kosong di harddisk server.
+    try:
+        with open(file_location, "wb+") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Gagal menyimpan file: {str(e)}")
+        
+    # UPDATE DATABASE (Saving the Path)
+    # Penting: Database TIDAK menyimpan gambar karena akan berat.
+    # Database hanya menyimpan "Alamat/Lokasi" gambar tersebut.
+    image_url = f"/static/images/{unique_filename}"
+    
+    current_user.profile_image = image_url
+    session.add(current_user)
+    session.commit()
+    session.refresh(current_user)
+    
+    return {"filename": file.filename, "url": image_url}
