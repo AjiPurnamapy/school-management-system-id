@@ -19,9 +19,8 @@ from backend.admin import SECRET_KEY_ADMIN
 import os
 from pathlib import Path
 
-# ==========================================
-# 1. SETUP FOLDER PENYIMPANAN GAMBAR
-# ==========================================
+
+# SETUP FOLDER PENYIMPANAN GAMBAR
 # Kita menggunakan "Absolute Path" (Alamat Mutlak) agar komputer tidak bingung
 # mencari folder gambar, tidak peduli dari folder mana terminal dijalankan.
 BASE_DIR = Path(__file__).resolve().parent  # Mencari alamat folder tempat file ini berada
@@ -53,17 +52,13 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# ==========================================
-# 2. HUBUNGKAN FOLDER GAMBAR KE INTERNET
-# ==========================================
+# HUBUNGKAN FOLDER GAMBAR KE INTERNET
 # 'Mount' artinya kita membuka akses folder ini ke publik.
 # Jadi jika user membuka 'http://localhost:8000/static/foto.jpg',
 # server akan mengambil file 'foto.jpg' dari folder STATIC_DIR di laptop kita.
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
-# ==========================================
-# 3. DAFTAR TAMU YANG DIIZINKAN (CORS)
-# ==========================================
+# DAFTAR TAMU YANG DIIZINKAN (CORS)
 # CORS adalah satpam browser. Kita harus mencatat siapa saja yang boleh
 # "berbicara" dengan backend ini.
 origin = [
@@ -72,7 +67,7 @@ origin = [
     "http://localhost:3000",
     "http://localhost:8000",
     
-    # PENTING: Ini alamat Frontend React kita.
+    # PENTING: Ini alamat Frontend.
     # Jika tidak dimasukkan, Login akan gagal (diblokir).
     "http://localhost:5173",
     "http://127.0.0.1:5173",
