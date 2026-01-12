@@ -1,54 +1,26 @@
-aiosmtplib
-alembic
-annotated-doc
-annotated-types
-anyio
-bcrypt==3.2.2
-blinker
-certifi
-cffi
-click
-colorama
-cryptography
-Deprecated
-dnspython
-ecdsa
-email-validator
 fastapi
-fastapi-mail
-greenlet
-h11
-httpcore
-httpx
-idna
 uvicorn[standard]
 sqlmodel
 sqlalchemy
 pydantic
 pydantic-settings
 email-validator
-Jinja2
-limits
-Mako
-MarkupSafe
+python-multipart
+python-dotenv
+alembic
 
 # Auth & Security
 python-jose[cryptography]
 passlib[bcrypt]
 bcrypt==4.0.1
-python-multipart
 itsdangerous
 
 # Utilities
-python-dotenv
 fastapi-mail
 slowapi
 sqladmin
-SQLAlchemy
-sqlmodel
-starlette
-typing-inspection
-typing_extensions
-uvicorn
-wrapt
-WTForms
+wtforms
+
+# Testing
+pytest
+httpx
