@@ -1,4 +1,7 @@
 import logging
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from fastapi.responses import HTMLResponse
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -72,6 +75,7 @@ app.add_middleware(
     https_only=False,
 )
 
+
 # pasang state limiter ke app
 app.state.limiter = limiter
 # pasang penanganan error (agar jika limit habis muncul pesan jelas)
@@ -86,7 +90,6 @@ setup_admin(app, engine)
 
 @app.get("/")
 def read_root():
-    logger.info("Ada yang akses endpoint root")
     return {"message": "Hello World"}
 
 @app.exception_handler(Exception)
