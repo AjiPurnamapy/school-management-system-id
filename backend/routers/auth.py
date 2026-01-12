@@ -6,7 +6,7 @@ import os
 from fastapi import UploadFile, File    # UploadFile, File: Tipe data khusus dari FastAPI untuk menangkap file upload
 from fastapi import APIRouter, Depends, HTTPException, status, Request, BackgroundTasks
 from fastapi.security import OAuth2PasswordRequestForm
-from sqlmodel import Session, select
+from sqlmodel import Session, select, or_
 from jose import jwt, JWTError
 from fastapi.responses import HTMLResponse
 from sqlalchemy.exc import IntegrityError
@@ -150,8 +150,11 @@ def login_for_access_token(
     form_data: OAuth2PasswordRequestForm = Depends(),
     session: Session = Depends(get_session)
     ):
-    # cari user di database berdasarkan username 
-    statement = select(User).where(User.name == form_data.username)
+    # LOGIC: DUKUNG LOGIN VIA EMAIL ATAU USERNAME
+    # Kita cari user yang namanya cocok ATAU emailnya cocok dengan input
+    statement = select(User).where(
+        or_(User.name == form_data.username, User.email == form_data.username)
+    )
     user = session.exec(statement).first()
     
     # cek user ada atau tidak, cek password cocok atau tidak
@@ -219,3 +222,72 @@ async def upload_photo(
     session.refresh(current_user)
     
     return {"filename": file.filename, "url": image_url}
+
+# ================================
+# FORGOT PASSWORD (MOCK EMAIL)
+# ================================
+from backend.schemas.user import ForgotPasswordRequest, ResetPasswordRequest
+
+@router.post("/forgot-password")
+def forgot_password(
+    request: ForgotPasswordRequest,
+    session: Session = Depends(get_session)
+):
+    # 1. Cari user
+    statement = select(User).where(User.email == request.email)
+    user = session.exec(statement).first()
+    
+    # 2. Jika user tidak ketemu, jangan bilang "User Gak Ada" (Security Risk)
+    # Tapi demi debug, kita return 404 saja kalau environment dev
+    if not user:
+        raise HTTPException(status_code=404, detail="Email tidak terdaftar")
+    
+    # 3. Buat Token Khusus Reset Password
+    reset_token = create_access_token(
+        data={"sub": user.email, "type": "reset_password"} # type beda biar tidak bisa dipakai login
+    )
+    
+    # 4. Mock Kirim Email (Print di Console)
+    # Di dunia nyata: params ini dikirim via SMTP
+    # DOMAIN default: localhost:5173 (Frontend Port)
+    reset_link = f"http://localhost:5173/reset?token={reset_token}"
+    
+    print("="*50)
+    print(f"[MOCK EMAIL] Reset Password Request for: {user.email}")
+    print(f"Click Link: {reset_link}")
+    print("="*50)
+    
+    return {"message": "Link reset password telah dikirim ke email (Lihat Console)"}
+
+@router.post("/reset-password")
+def reset_password(
+    request: ResetPasswordRequest,
+    session: Session = Depends(get_session)
+):
+    try:
+        # 1. Decode Token
+        payload = jwt.decode(request.token, SECRET_KEY, algorithms=[ALGORITHM])
+        email = payload.get("sub")
+        token_type = payload.get("type")
+        
+        # 2. Validasi Tipe Token
+        if token_type != "reset_password":
+            raise HTTPException(status_code=400, detail="Token tidak valid untuk reset password")
+            
+    except JWTError:
+        raise HTTPException(status_code=400, detail="Token Kadaluarsa atau rusak")
+        
+    # 3. Cari User
+    statement = select(User).where(User.email == email)
+    user = session.exec(statement).first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User tidak ditemukan")
+        
+    # 4. Ganti Password
+    # Jangan lupa hash password baru!
+    user.password = get_password_hash(request.new_password)
+    session.add(user)
+    session.commit()
+    
+    return {"message": "Password berhasil diubah! Silahkan login dengan password baru."}

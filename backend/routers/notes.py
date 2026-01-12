@@ -1,6 +1,6 @@
-from typing import List
+from typing import List, Optional # Optional: artinya boleh kosong (None)
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlmodel import Session, select
+from sqlmodel import Session, select, col, desc, asc # SQL helpers
 from backend.schemas.notes import ReadNotes, CreateNotes
 from backend.database import get_session
 from backend.models import Note, User
@@ -33,25 +33,46 @@ def create_notes(
 
 @router.get("/",
     response_model=List[ReadNotes],
-    summary="Melihat Catatan",
-    description="Endpoint ini untuk melihat catatan yang telah dibuat, dan dibatasi 100 pencarian catatan per halaman",
+    summary="Melihat Catatan (Cari & Urutkan)",
+    description="Endpoint ini bisa mencari catatan (q) dan mengurutkan (sort_by), serta dibatasi per halaman",
 )
 def read_my_notes(
+    q: Optional[str] = None, # Keyword Pencarian (opsional)
+    sort_by: str = "date_desc", # Urutan (default: Terbaru di atas)
     offset : int = 0,       # default: mulai dari awal
     limit : int = Query(default=10, le=100),     # default: 10 data, maksimal 100 data
     session: Session = Depends(get_session),
     current_user : User = Depends(get_current_user),
 ):
-    # set untuk menampilkan yg hanya milik user
+    # FILTER PEMILIK (Security)
+    # Hanya ambil catatan milik user yang sedang login
     statement = select(Note).where(Note.owner_id == current_user.id)
 
+    # FILTER PENCARIAN (Search)
+    # Jika user mengirim parameter 'q' (misak ?q=belajar),
+    # kita cari judul ATAU isi yang mengandung kata tersebut.
+    if q:
+        # col(Note.title).contains(q) mirip SQL: WHERE title LIKE '%q%'
+        statement = statement.where(
+            col(Note.title).contains(q) | col(Note.content).contains(q)
+        )
+
+    # PENGURUTAN (Sorting)
+    # date_desc: Terbaru (created_at DESCENDING/Turun)
+    # date_asc : Terlama (created_at ASCENDING/Naik)
+    if sort_by == "date_desc":
+        statement = statement.order_by(desc(Note.created_at))
+    elif sort_by == "date_asc":
+        statement = statement.order_by(asc(Note.created_at))
+
+    # PAGINATION (Halaman)
+    # Potong data sesuai permintaan (misal halaman 2, offset=10)
     statement = statement.offset(offset).limit(limit)
 
     result = session.exec(statement).all()
     return result
 
-@router.put(
-    "/{notes_id}",
+@router.put("/{notes_id}",
     response_model=ReadNotes,
     summary="Update Catatan",
     description="Endpoint ini untuk mengupdate catatan yang diinginkan berdasarkan id catatan-nya"

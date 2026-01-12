@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 
 const Login = () => {
     const [username, setUsername] = useState('');
@@ -48,37 +48,52 @@ const Login = () => {
     };
 
     return (
-        <div className="glass-card">
-            <h2 className="text-center mb-4">Welcome Back! 👋</h2>
-            <form onSubmit={handleLogin}>
-                <div className="form-group">
-                    <label className="form-label">Username</label>
-                    <input 
-                        type="text" 
-                        className="form-control" 
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value)}
-                        placeholder="Enter your username"
-                        required
-                    />
-                </div>
-                <div className="form-group">
-                    <label className="form-label">Password</label>
-                    <input 
-                        type="password" 
-                        className="form-control" 
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder="Enter your password"
-                        required
-                    />
-                </div>
-                <button type="submit" className="btn-primary" disabled={loading}>
-                    {loading ? 'Logging in...' : 'Login'}
-                </button>
-                
-                {error && <p className="text-danger text-center">{error}</p>}
-            </form>
+        <div className="auth-wrapper">
+            <div className="glass-card" style={{ maxWidth: '400px', width: '100%' }}>
+                <h2 className="text-center mb-4">Welcome Back! 👋</h2>
+                <form onSubmit={handleLogin}>
+                    <div className="form-group">
+                        <label className="form-label">Username / Email</label>
+                        <input 
+                            type="text" 
+                            className="form-control" 
+                            value={username}
+                            onChange={(e) => setUsername(e.target.value)}
+                            placeholder="Enter your username or email"
+                            required
+                        />
+                    </div>
+                    <div className="form-group">
+                        <label className="form-label">Password</label>
+                        <input 
+                            type="password" 
+                            className="form-control" 
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            placeholder="Enter your password"
+                            required
+                        />
+                    </div>
+                    
+                    <div className="text-right mb-4">
+                        <Link to="/recovery" className="text-sm text-muted hover:text-primary">
+                            Lupa Password?
+                        </Link>
+                    </div>
+
+                    <button type="submit" className="btn-primary" disabled={loading}>
+                        {loading ? 'Logging in...' : 'Login'}
+                    </button>
+                    
+                    {error && <p className="text-danger mt-3">{error}</p>}
+
+                    <div className="mt-4 text-center">
+                        <p className="text-muted">
+                            Don't have an account? <Link to="/signup">Create one</Link>
+                        </p>
+                    </div>
+                </form>
+            </div>
         </div>
     );
 };

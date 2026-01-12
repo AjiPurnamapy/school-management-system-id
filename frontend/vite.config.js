@@ -18,6 +18,8 @@ export default defineConfig({
       '/verify': 'http://localhost:8000',
       '/myprofile': 'http://localhost:8000',
       '/upload-photo': 'http://localhost:8000',
+      '/forgot-password': 'http://localhost:8000',
+      '/reset-password': 'http://localhost:8000',
       '/static': 'http://localhost:8000',
     }
   }
