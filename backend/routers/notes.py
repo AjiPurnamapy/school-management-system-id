@@ -1,10 +1,11 @@
 from typing import List, Optional # Optional: artinya boleh kosong (None)
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlmodel import Session, select, col, desc, asc # SQL helpers
-from backend.schemas.notes import ReadNotes, CreateNotes
+from sqlmodel import Session, select, col, desc, asc, func # SQL helpers
+from backend.schemas.notes import ReadNotes, CreateNotes, PaginatedResponse # Import PaginatedResponse
 from backend.database import get_session
 from backend.models import Note, User
 from backend.dependencies import get_current_user
+import math # Import math for ceil
 
 router = APIRouter(
     prefix="/notes",    # semua URl diisi otomatis depannya/catatan
@@ -32,7 +33,7 @@ def create_notes(
     return notes_db
 
 @router.get("/",
-    response_model=List[ReadNotes],
+    response_model=PaginatedResponse,
     summary="Melihat Catatan (Cari & Urutkan)",
     description="Endpoint ini bisa mencari catatan (q) dan mengurutkan (sort_by), serta dibatasi per halaman",
 )
@@ -44,33 +45,51 @@ def read_my_notes(
     session: Session = Depends(get_session),
     current_user : User = Depends(get_current_user),
 ):
-    # FILTER PEMILIK (Security)
-    # Hanya ambil catatan milik user yang sedang login
-    statement = select(Note).where(Note.owner_id == current_user.id)
+    # 1. BASE STATEMENT (User Filter)
+    base_statement = select(Note).where(Note.owner_id == current_user.id)
 
-    # FILTER PENCARIAN (Search)
-    # Jika user mengirim parameter 'q' (misak ?q=belajar),
-    # kita cari judul ATAU isi yang mengandung kata tersebut.
+    # 2. FILTER PENCARIAN
     if q:
-        # col(Note.title).contains(q) mirip SQL: WHERE title LIKE '%q%'
-        statement = statement.where(
+        base_statement = base_statement.where(
             col(Note.title).contains(q) | col(Note.content).contains(q)
         )
 
-    # PENGURUTAN (Sorting)
-    # date_desc: Terbaru (created_at DESCENDING/Turun)
-    # date_asc : Terlama (created_at ASCENDING/Naik)
+    # 3. HITUNG TOTAL DATA (Sebelum dipotong pagination)
+    # Kita butuh info "Total 50 data" agar frontend tau ada berapa halaman.
+    # Note: Kita gunakan count() dari library sqlmodel
+    total_statement = select(func.count()).select_from(base_statement.subquery())
+    total_items = session.exec(total_statement).one()
+
+    # 4. PENGURUTAN (Sorting)
     if sort_by == "date_desc":
-        statement = statement.order_by(desc(Note.created_at))
+        base_statement = base_statement.order_by(desc(Note.created_at))
     elif sort_by == "date_asc":
-        statement = statement.order_by(asc(Note.created_at))
+        base_statement = base_statement.order_by(asc(Note.created_at))
 
-    # PAGINATION (Halaman)
-    # Potong data sesuai permintaan (misal halaman 2, offset=10)
-    statement = statement.offset(offset).limit(limit)
+    # 5. PAGINATION (Potong Data)
+    paginated_statement = base_statement.offset(offset).limit(limit)
+    data = session.exec(paginated_statement).all()
 
-    result = session.exec(statement).all()
-    return result
+    # 6. HITUNG INFO HALAMAN
+    # Rumus Total Halaman: Total Data / Limit (dibulatkan ke atas)
+    # Contoh: 12 data / 10 limit = 1.2 -> jadi 2 halaman
+    # Jika total_items 0, maka total_pages 0 atau 1 (kita set 1 minimal agar tidak error)
+    if total_items == 0:
+        total_pages = 1
+    else:
+        total_pages = math.ceil(total_items / limit)
+    
+    # Hitung halaman sekarang (dari offset)
+    # Offset 0 -> Page 1, Offset 10 -> Page 2
+    current_page = (offset // limit) + 1
+
+    return PaginatedResponse(
+        data=data,
+        total_items=total_items,
+        page=current_page,
+        size=limit,
+        total_pages=total_pages
+    )
 
 @router.put("/{notes_id}",
     response_model=ReadNotes,

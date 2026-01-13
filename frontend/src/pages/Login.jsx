@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 
 const Login = () => {
     const [username, setUsername] = useState('');
@@ -8,6 +8,18 @@ const Login = () => {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
+
+    // Cek apakah ada parameter ?verified=true (dari Redirect Backend)
+    const [searchParams] = useSearchParams();
+    const verified = searchParams.get("verified");
+
+    // Efek Samping: Bersihkan URL supaya kalau direfresh pesan sukses hilang
+    useEffect(() => {
+        if (verified) {
+            // Hapus query param dari URL bar tanpa reload halaman
+            window.history.replaceState(null, '', window.location.pathname);
+        }
+    }, [verified]);
 
     const handleLogin = async (e) => {
         e.preventDefault();
@@ -51,6 +63,13 @@ const Login = () => {
         <div className="auth-wrapper">
             <div className="glass-card" style={{ maxWidth: '400px', width: '100%' }}>
                 <h2 className="text-center mb-4">Welcome Back! 👋</h2>
+
+                {verified && (
+                    <div className="alert alert-success mb-4" style={{ textAlign: 'center', background: '#d1fae5', color: '#065f46', padding: '10px', borderRadius: '8px' }}>
+                        ✅ Email Verified! Silahkan Login.
+                    </div>
+                )}
+
                 <form onSubmit={handleLogin}>
                     <div className="form-group">
                         <label className="form-label">Username / Email</label>

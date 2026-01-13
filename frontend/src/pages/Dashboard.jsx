@@ -12,6 +12,11 @@ const Dashboard = () => {
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const [sortBy, setSortBy] = useState('date_desc');
     const [initialLoading, setInitialLoading] = useState(true);
+    
+    // Pagination State
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const PAGE_SIZE = 10;
 
     const navigate = useNavigate();
 
@@ -19,7 +24,8 @@ const Dashboard = () => {
     useEffect(() => {
         const handler = setTimeout(() => {
             setDebouncedSearch(searchQuery);
-        }, 500); // Tunggu 500ms setelah user berhenti mengetik
+            setCurrentPage(1); // Reset ke halaman 1 jika search berubah
+        }, 500); 
 
         return () => {
             clearTimeout(handler);
@@ -27,10 +33,6 @@ const Dashboard = () => {
     }, [searchQuery]);
 
     const fetchData = async () => {
-        // Jangan set loading=true jika hanya searching (opsional, tapi biar tidak kedip parah)
-        // Atau biarkan tapi debounce membantu mengurangi frekuensi.
-        // Kita set loading true, tapi karena debounce, hanya muncul setelah selesai ketik.
-        
         const token = localStorage.getItem('token');
         if (!token) {
             navigate('/');
@@ -38,23 +40,31 @@ const Dashboard = () => {
         }
 
         try {
-            // Ambil Notes dengan parameter Search & Sort
-            // Params: ?q=...&sort_by=...
-            const params = {
-                sort_by: sortBy
+            // OPTIMISASI: Gunakan Promise.all untuk request Parallel
+            // Hitung Offset berdasarkan Current Page
+            const offset = (currentPage - 1) * PAGE_SIZE;
+
+            const params = { 
+                sort_by: sortBy,
+                offset: offset,
+                limit: PAGE_SIZE
             };
             if (debouncedSearch) params.q = debouncedSearch;
 
-            const res = await axios.get('/notes/', { 
-                headers: { Authorization: `Bearer ${token}` },
-                params: params
-            });
-            setNotes(res.data);
+            const [resNotes, resProfile] = await Promise.all([
+                axios.get('/notes/', { 
+                    headers: { Authorization: `Bearer ${token}` },
+                    params: params
+                }),
+                axios.get('/myprofile', {
+                    headers: { Authorization: `Bearer ${token}` }
+                })
+            ]);
 
-            // Ambil Data Profil User (untuk nama & foto)
-            const resProfile = await axios.get('/myprofile', {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            // UPDATE: Backend sekarang mengembalikan { data: [...], total_items: ..., total_pages: ... }
+            setNotes(resNotes.data.data); 
+            setTotalPages(resNotes.data.total_pages);
+            
             setUser(resProfile.data);
 
         } catch (err) {
@@ -68,11 +78,11 @@ const Dashboard = () => {
     };
 
     // Panggil fetchData saat komponen pertama kali dimuat
-    // ATAU saat debouncedSearch / sortBy berubah
+    // ATAU saat debouncedSearch / sortBy / currentPage berubah
     useEffect(() => {
         fetchData();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [debouncedSearch, sortBy]);
+    }, [debouncedSearch, sortBy, currentPage]);
 
     // Fungsi Submit (Create / Update)
     const handleSaveNote = async (e) => {
@@ -154,6 +164,20 @@ const Dashboard = () => {
         } catch (err) {
             console.error(err);
             alert("Gagal upload foto.");
+        }
+    };
+
+    const handleNextPage = () => {
+        if (currentPage < totalPages) {
+            setCurrentPage(prev => prev + 1);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    };
+
+    const handlePrevPage = () => {
+        if (currentPage > 1) {
+            setCurrentPage(prev => prev - 1);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
     };
 
@@ -288,6 +312,33 @@ const Dashboard = () => {
                             </div>
                         ))}
                     </div>
+
+                    {/* Pagination Controls */}
+                    {totalPages > 1 && (
+                        <div className="pagination-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '20px', marginTop: '40px', paddingBottom: '40px' }}>
+                            <button 
+                                onClick={handlePrevPage} 
+                                disabled={currentPage === 1}
+                                className="btn-primary" 
+                                style={{ width: 'auto', background: currentPage === 1 ? '#ccc' : '#4f46e5', cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
+                            >
+                                &lt; Prev
+                            </button>
+                            
+                            <span style={{ fontWeight: 'bold', color: '#555' }}>
+                                Page {currentPage} of {totalPages}
+                            </span>
+                            
+                            <button 
+                                onClick={handleNextPage} 
+                                disabled={currentPage === totalPages}
+                                className="btn-primary" 
+                                style={{ width: 'auto', background: currentPage === totalPages ? '#ccc' : '#4f46e5', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer' }}
+                            >
+                                Next &gt;
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

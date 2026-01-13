@@ -39,11 +39,10 @@ const Register = () => {
             await axios.post('/register', {
                 ...formData,
                 age: parseInt(formData.age), // Pastikan age jadi integer
-                is_active: true // Auto active untuk kemudahan experience (opsional, tergantung backend)
             });
 
             // Jika sukses, alert dan redirect ke login
-            alert("Registrasi Berhasil! Silahkan Login.");
+            alert("Registrasi Berhasil! Silakan cek email Anda untuk verifikasi akun sebelum login.");
             navigate('/');
 
         } catch (err) {

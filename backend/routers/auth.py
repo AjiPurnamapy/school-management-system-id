@@ -8,15 +8,16 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request, Backgrou
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel import Session, select, or_
 from jose import jwt, JWTError
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse # Import RedirectResponse
 from sqlalchemy.exc import IntegrityError
-
 from backend.database import get_session
+
+# ... (imports lainnya tetap sama, jangan dihapus) 
 from backend.schemas.user import UserCreate, UserRead
 from backend.schemas.token import Token
 from backend.models import User
 from backend.limiter import limiter
-from backend.email import send_verification_email
+from backend.email import send_verification_email, send_reset_password_email
 from backend.utils.templates import get_error_html, get_success_html
 from backend.dependencies import (
     get_password_hash,
@@ -26,6 +27,7 @@ from backend.dependencies import (
     ALGORITHM,
     SECRET_KEY
 )
+
 # Setup logging
 logger = logging.getLogger(__name__)
 
@@ -53,13 +55,13 @@ def create_user(
             data={"sub": user_db.email, "type" : "email_verification"}
         )
 
-        # kirim email, uncommet jika nanti mau deploy
-        # background_tasks.add_task(
-        #     send_verification_email,
-        #     user_db.email,
-        #     user_db.name,
-        #     verify_token
-        # )
+        # kirim email (sekarang sudah aktif!)
+        background_tasks.add_task(
+            send_verification_email,
+            user_db.email,
+            user_db.name,
+            verify_token
+        )
         logger.info(f"New user registered: {user_db.name} ({user_db.email})")
         return user_db              
     
@@ -79,7 +81,7 @@ def create_user(
         )
 
 # endpoint khusus verifikasi
-@router.get("/verify", response_class=HTMLResponse)
+@router.get("/verify")
 def verify_email(token: str, session: Session = Depends(get_session)):
     try:
         # Deskripsi token
@@ -115,26 +117,18 @@ def verify_email(token: str, session: Session = Depends(get_session)):
     # cek apakah user sudah aktif sebelumnya
     if user.is_active:
         logger.info(f"User already verified: {user.email}")
-        return HTMLResponse(
-            content= get_success_html(
-                "Akun Sudah Aktif",
-                "Akun Kamu sudah diverifikasi sebelumnya. silahkan login."
-            ),
-            status_code=status.HTTP_200_OK
-        )
+        # REDIRECT KE FRONTEND (Root URL karena Login ada di /)
+        return RedirectResponse("http://localhost:5173/?verified=true", status_code=302)
+
     try:
         user.is_active = True
         session.add(user)
         session.commit()
         logger.info(f"User verified successfully: {user.email}")
 
-        return HTMLResponse(
-            content= get_success_html(
-                "Verifikasi Berhasil!",
-                "Akun Kamu sekarang sudah aktif. silahkan kembali ke aplikasi untuk login."
-            ),
-            status_code=status.HTTP_200_OK
-        )
+        # REDIRECT KE FRONTEND (Root URL)
+        return RedirectResponse("http://localhost:5173/?verified=true", status_code=302)
+        
     except Exception as e:
         session.rollback()
         logger.error(f"Error activating user {email} : {str(e)}")
@@ -224,40 +218,34 @@ async def upload_photo(
     return {"filename": file.filename, "url": image_url}
 
 # ================================
-# FORGOT PASSWORD (MOCK EMAIL)
+# FORGOT PASSWORD (REAL EMAIL)
 # ================================
 from backend.schemas.user import ForgotPasswordRequest, ResetPasswordRequest
 
 @router.post("/forgot-password")
 def forgot_password(
     request: ForgotPasswordRequest,
+    background_tasks: BackgroundTasks,
     session: Session = Depends(get_session)
 ):
     # 1. Cari user
     statement = select(User).where(User.email == request.email)
     user = session.exec(statement).first()
     
-    # 2. Jika user tidak ketemu, jangan bilang "User Gak Ada" (Security Risk)
-    # Tapi demi debug, kita return 404 saja kalau environment dev
+    # 2. Jika user tidak ketemu, return 404
     if not user:
         raise HTTPException(status_code=404, detail="Email tidak terdaftar")
     
     # 3. Buat Token Khusus Reset Password
     reset_token = create_access_token(
-        data={"sub": user.email, "type": "reset_password"} # type beda biar tidak bisa dipakai login
+        data={"sub": user.email, "type": "reset_password"} 
     )
     
-    # 4. Mock Kirim Email (Print di Console)
-    # Di dunia nyata: params ini dikirim via SMTP
-    # DOMAIN default: localhost:5173 (Frontend Port)
-    reset_link = f"http://localhost:5173/reset?token={reset_token}"
+    # 4. Kirim Email RESET PASSWORD
+    background_tasks.add_task(send_reset_password_email, user.email, reset_token)
     
-    print("="*50)
-    print(f"[MOCK EMAIL] Reset Password Request for: {user.email}")
-    print(f"Click Link: {reset_link}")
-    print("="*50)
-    
-    return {"message": "Link reset password telah dikirim ke email (Lihat Console)"}
+    return {"message": "Link reset password telah dikirim ke email."}
+
 
 @router.post("/reset-password")
 def reset_password(
