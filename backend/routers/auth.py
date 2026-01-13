@@ -17,7 +17,7 @@ from backend.schemas.user import UserCreate, UserRead
 from backend.schemas.token import Token
 from backend.models import User
 from backend.limiter import limiter
-from backend.email import send_verification_email, send_reset_password_email
+from backend.mail_service import send_verification_email, send_reset_password_email
 from backend.utils.templates import get_error_html, get_success_html
 from backend.dependencies import (
     get_password_hash,

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import Storage from './Storage';
 
 const Dashboard = () => {
     const [notes, setNotes] = useState([]);
@@ -12,6 +13,10 @@ const Dashboard = () => {
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const [sortBy, setSortBy] = useState('date_desc');
     const [initialLoading, setInitialLoading] = useState(true);
+    const [error, setError] = useState(null); // Add Error State
+    
+    // UI State
+    const [activeTab, setActiveTab] = useState('notes'); // 'notes' or 'storage'
     
     // Pagination State
     const [currentPage, setCurrentPage] = useState(1);
@@ -40,6 +45,7 @@ const Dashboard = () => {
         }
 
         try {
+            setError(null); // Reset error sebelum fetch
             // OPTIMISASI: Gunakan Promise.all untuk request Parallel
             // Hitung Offset berdasarkan Current Page
             const offset = (currentPage - 1) * PAGE_SIZE;
@@ -71,6 +77,9 @@ const Dashboard = () => {
             console.error(err);
             if (err.response && err.response.status === 401) {
                 handleLogout();
+            } else {
+                // Set error jika bukan auth error (misal backend mati)
+                setError("Gagal menghubungi server. Pastikan Backend sudah berjalan.");
             }
         } finally {
             setInitialLoading(false);
@@ -117,6 +126,7 @@ const Dashboard = () => {
         setTitle(note.title);
         setContent(note.content);
         setEditId(note.id);
+        setActiveTab('notes'); // Switch to notes tab if editing
         // Scroll ke atas (opsional) agar user sadar form sudah terisi
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
@@ -188,6 +198,24 @@ const Dashboard = () => {
 
     if (initialLoading) return <div style={{color:'#4f46e5', textAlign:'center', marginTop:'20vh', fontWeight:'bold', fontSize:'1.2rem'}}>Loading Data...</div>;
 
+    if (error) {
+        return (
+            <div className="flex-center" style={{height:'100vh', flexDirection:'column', gap:'20px'}}>
+                <div style={{fontSize:'3rem'}}>🔌</div>
+                <h3>Koneksi Terputus</h3>
+                <p className="text-muted">{error}</p>
+                <button onClick={() => window.location.reload()} className="btn-primary" style={{width:'auto', padding:'10px 30px'}}>
+                    Coba Lagi
+                </button>
+                <div style={{marginTop:'20px'}}> 
+                    <button onClick={handleLogout} className="btn-sm" style={{background:'transparent', border:'none', color:'#dc3545', cursor:'pointer', textDecoration:'underline'}}>
+                        Logout / Kembali ke Home
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="dashboard-wrapper">
             <div className="glass-card dashboard-header">
@@ -211,49 +239,86 @@ const Dashboard = () => {
 
             <div className="dashboard-content">
                 
-                {/* Kolom Kiri: Form Buat/Edit Note */}
+                {/* Kolom Kiri: Sidebar Menu + Notes Form */}
                 <div className="glass-card dashboard-sidebar">
-                    <h3 className="mt-0">{editId ? '✏️ Edit Note' : '+ New Note'}</h3>
-                    <p className="text-muted text-sm mb-4">
-                        {editId ? 'Silahkan edit catatan Anda.' : 'Tulis idemu di sini agar tidak lupa.'}
-                    </p>
-                    <form onSubmit={handleSaveNote}>
-                        <div className="form-group">
-                            <label className="form-label">
-                                Title <small className="text-muted font-normal">(min. 3 chars)</small>
-                            </label>
-                            <input 
-                                type="text" className="form-control"
-                                value={title} onChange={(e) => setTitle(e.target.value)} 
-                                minLength={3} placeholder="Judul catatan..." required 
-                            />
-                        </div>
-                        <div className="form-group">
-                            <label className="form-label">
-                                Content <small className="text-muted font-normal">(min. 4 chars)</small>
-                            </label>
-                            <textarea 
-                                className="form-control" rows="8"
-                                value={content} onChange={(e) => setContent(e.target.value)} 
-                                minLength={4} placeholder="Isi catatan..." required 
-                            ></textarea>
-                        </div>
-                        
-                        <div className="flex-between gap-2">
-                            {editId && (
-                                <button type="button" onClick={handleCancelEdit} className="btn-primary" style={{ background: '#6c757d' }}>
-                                    Cancel
+                    
+                    {/* NAVIGATION MENU */}
+                    <div className="nav-menu mb-4" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        <button 
+                            onClick={() => setActiveTab('notes')}
+                            className="btn-primary"
+                            style={activeTab === 'notes' ? {} : {background:'transparent', color:'#4f46e5', border:'1px solid #4f46e5'}}
+                        >
+                            📝 My Notes
+                        </button>
+                        <button 
+                            onClick={() => setActiveTab('storage')}
+                            className="btn-primary"
+                            style={activeTab === 'storage' ? {} : {background:'transparent', color:'#4f46e5', border:'1px solid #4f46e5'}}
+                        >
+                            ☁️ Cloud Storage
+                        </button>
+                    </div>
+
+                    <hr className="mb-4" style={{borderTop: '1px solid #eee'}}/>
+
+                   {/* Form CREATE NOTE (Hanya Muncul di Tab Notes) */}
+                   {activeTab === 'notes' && (
+                       <>
+                        <h3 className="mt-0">{editId ? '✏️ Edit Note' : '+ New Note'}</h3>
+                        <p className="text-muted text-sm mb-4">
+                            {editId ? 'Silahkan edit catatan Anda.' : 'Tulis idemu di sini agar tidak lupa.'}
+                        </p>
+                        <form onSubmit={handleSaveNote}>
+                            <div className="form-group">
+                                <label className="form-label">
+                                    Title <small className="text-muted font-normal">(min. 3 chars)</small>
+                                </label>
+                                <input 
+                                    type="text" className="form-control"
+                                    value={title} onChange={(e) => setTitle(e.target.value)} 
+                                    minLength={3} placeholder="Judul catatan..." required 
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">
+                                    Content <small className="text-muted font-normal">(min. 4 chars)</small>
+                                </label>
+                                <textarea 
+                                    className="form-control" rows="8"
+                                    value={content} onChange={(e) => setContent(e.target.value)} 
+                                    minLength={4} placeholder="Isi catatan..." required 
+                                ></textarea>
+                            </div>
+                            
+                            <div className="flex-between gap-2">
+                                {editId && (
+                                    <button type="button" onClick={handleCancelEdit} className="btn-primary" style={{ background: '#6c757d' }}>
+                                        Cancel
+                                    </button>
+                                )}
+                                <button type="submit" className="btn-primary">
+                                    {editId ? 'Update Note' : 'Save Note'}
                                 </button>
-                            )}
-                            <button type="submit" className="btn-primary">
-                                {editId ? 'Update Note' : 'Save Note'}
-                            </button>
-                        </div>
-                    </form>
+                            </div>
+                        </form>
+                       </>
+                   )}
+
+                   {/* Info Panel untuk Storage */}
+                   {activeTab === 'storage' && (
+                       <div className="text-center text-muted">
+                           <p>Simpan file penting Anda di sini.</p>
+                           <small>Support: PDF, DOCX, JPG, PNG</small>
+                       </div>
+                   )}
                 </div>
 
                 {/* Kolom Kanan: Daftar Notes */}
                 <div className="dashboard-main">
+                    
+                    {activeTab === 'notes' ? (
+                        <>
                     
                      <div className="glass-card dashboard-toolbar">
                         <div style={{ flex: 1, display: 'flex', alignItems: 'center', background: 'white', padding: '0 15px', borderRadius: '12px', border: '1px solid #ddd' }}>
@@ -338,6 +403,11 @@ const Dashboard = () => {
                                 Next &gt;
                             </button>
                         </div>
+                    )}
+                {/* End of Notes Tab Content */}
+                        </>
+                    ) : (
+                        <Storage />
                     )}
                 </div>
             </div>

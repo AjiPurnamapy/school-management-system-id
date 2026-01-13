@@ -20,3 +20,11 @@ class Note(SQLModel, table=True):
     # Penanda Waktu (untuk fitur sorting)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+class UserFile(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    filename: str = Field(max_length=255)
+    file_url: str = Field(max_length=500)
+    file_type: str = Field(max_length=50) # pdf, image, docx
+    owner_id: Optional[int] = Field(foreign_key="user.id")
+    created_at: datetime = Field(default_factory=datetime.utcnow)

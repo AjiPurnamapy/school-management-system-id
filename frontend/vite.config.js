@@ -20,6 +20,8 @@ export default defineConfig({
       '/upload-photo': 'http://localhost:8000',
       '/forgot-password': 'http://localhost:8000',
       '/reset-password': 'http://localhost:8000',
+      '/reset-password': 'http://localhost:8000',
+      '/files': 'http://localhost:8000',
       '/static': 'http://localhost:8000',
     }
   }
