@@ -104,18 +104,27 @@ def test_search_notes(client, token):
     # 2. Cari "Python"
     # Harusnya cuma ketemu 1 (Belajar Python)
     res_python = client.get("/notes/?q=Python", headers=headers)
-    assert len(res_python.json()) == 1
-    assert res_python.json()[0]["title"] == "Belajar Python"
+    
+    # FIX: Respon bukan list langsung, tapi dict {data: [], page: 1...}
+    # Jadi kita ambil key ["data"]
+    data_python = res_python.json()["data"]
+    
+    assert len(data_python) == 1
+    assert data_python[0]["title"] == "Belajar Python"
     
     # 3. Cari "Goreng"
     # Harusnya cuma ketemu 1 (Resep Nasi Goreng)
     res_masak = client.get("/notes/?q=Goreng", headers=headers)
-    assert len(res_masak.json()) == 1
-    assert res_masak.json()[0]["title"] == "Resep Nasi Goreng"
+    data_masak = res_masak.json()["data"]
+    
+    assert len(data_masak) == 1
+    assert data_masak[0]["title"] == "Resep Nasi Goreng"
 
     # 4. Cari "Zat Besi" (Gak ada)
     res_zonk = client.get("/notes/?q=Zat Besi", headers=headers)
-    assert len(res_zonk.json()) == 0
+    data_zonk = res_zonk.json()["data"]
+    
+    assert len(data_zonk) == 0
 
 # skenario 6: Test Login pakai Email
 def test_login_by_email(client, session: Session):
