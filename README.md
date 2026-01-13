@@ -1,79 +1,105 @@
-# 📒 Notes API Service
+# 📒 Notes App Ecosystem (Fullstack)
 
-**Notes API** adalah layanan backend modern untuk aplikasi manajemen catatan pribadi. Dibangun dengan fokus pada performa, keamanan, dan skalabilitas menggunakan teknologi terbaru.
+**Notes App** adalah sistem manajemen produktivitas lengkap (Web Dashboard + Backend API) yang dibangun dengan standar industri. Fokus utama project ini adalah performa, keamanan, dan *User Experience* (UX) yang modern.
+
+![License](https://img.shields.io/badge/license-MIT-blue.svg) ![Python](https://img.shields.io/badge/python-v3.10+-blue.svg) ![React](https://img.shields.io/badge/react-v18-blue.svg)
 
 ---
 
-## 🚀 Fitur Utama
+## 🚀 Fitur Unggulan
 
-### 🔐 Keamanan & Autentikasi
-*   **JWT Authentication**: Login aman menggunakan JSON Web Token.
-*   **Password Hashing**: Password user dilindungi dengan algoritma Bcrypt.
-*   **Email Verification**: Sistem verifikasi email wajib sebelum login untuk mencegah akun spam.
+### 🔐 Autentikasi Modern
+*   **Secure Login**: Mendukung Login via Email atau Username.
+*   **Email Verification**: Alur aktivasi akun via email SMTP (Gmail).
+*   **Forgot Password**: Fitur reset password yang aman dengan token.
+*   **JWT Security**: Sesi user dilindungi JSON Web Token & Bcrypt Hashing.
 
-### 📝 Manajemen Catatan
-*   **CRUD Operations**: Create, Read, Update, dan Delete catatan dengan mudah.
-*   **Ownership Security**: User hanya bisa mengedit dan menghapus catatan miliknya sendiri.
-*   **Pagination**: Mendukung pengambilan data dalam jumlah besar dengan sistem halaman (offset/limit).
+### 📝 Smart Notes (Catatan)
+*   **Search Engine**: Pencarian catatan *real-time* (Debounced).
+*   **Sorting**: Urutkan catatan berdasarkan tanggal terbaru/terlama.
+*   **Pagination**: Load ribuan catatan tanpa berat (Server-side logic).
+*   **Rich UI**: Tampilan Masonry Grid (seperti Pinterest).
 
-### 🛡️ Proteksi & Optimasi
-*   **Rate Limiting**: Mencegah serangan brute-force atau spam request (Max 5 login attempt / menit).
-*   **Async Database**: Menggunakan SQLModel & Async session untuk performa tinggi.
-*   **Docker Ready**: Siap di-deploy kapan saja menggunakan Docker & Docker Compose.
+### ☁️ Personal Cloud Storage (New!)
+*   **File Manager**: Upload, simpan, dan kelola file pribadi (PDF, DOCX, JPG).
+*   **Type Validation**: Proteksi upload hanya untuk file aman.
+*   **Storage Cap**: Batas ukuran file 5MB per upload.
 
 ---
 
 ## 🛠️ Tech Stack
 
-*   **Framework**: [FastAPI](https://fastapi.tiangolo.com/) (Python)
-*   **Database**: PostgreSQL (Production) / SQLite (Development)
-*   **ORM**: SQLModel (kombinasi Pydantic & SQLAlchemy)
-*   **Schema Migration**: Alembic
-*   **Container**: Docker & Docker Compose
+### Backend (Server)
+*   **Framework**: [FastAPI](https://fastapi.tiangolo.com/) (Python High Performance)
+*   **Database**: SQLite (Dev) / PostgreSQL (Prod) via **SQLModel**
+*   **Security**: OAuth2, JWT, Passlib (Bcrypt), SlowAPI (Rate Limiter)
+*   **Background Tasks**: Handling kirim email tanpa blocking.
+
+### Frontend (Client)
+*   **Framework**: React.js (Vite Bundle)
+*   **Styling**: CSS Modules + Glassmorphism UI
+*   **HTTP Client**: Axios dengan Interceptors (Otomatis refresh token/handle error)
+*   **Navigation**: React Router DOM v6
 
 ---
 
-## 📖 Dokumentasi API
+## 🔌 API Reference (Endpoints)
 
-Salah satu keunggulan FastAPI adalah dokumentasi yang **Terbuat Otomatis**. Anda tidak perlu membaca file teks statis panjang.
+Dokumentasi lengkap (Swagger UI) tersedia di: `http://localhost:8000/docs`
 
-Setelah aplikasi berjalan (baik lokal maupun server), akses URL berikut:
-
-### 1. Swagger UI (Interaktif)
-📍 **URL**: `/docs` (contoh: `http://localhost:8000/docs`)
-*   Dashboard visual untuk mencoba semua endpoint secara langsung.
-*   Bisa tombol "Try it out" untuk mengirim request sungguhan.
-*   Otomatis mendeteksi skema data Input & Output.
-
-### 2. ReDoc (Referensi Statis)
-📍 **URL**: `/redoc` (contoh: `http://localhost:8000/redoc`)
-*   Dokumentasi yang lebih bersih dan rapi, cocok untuk dibagikan ke tim Frontend.
-
----
-
-## 🔌 Daftar Endpoint Singkat
-
-Berikut adalah ringkasan path yang tersedia:
-
-### Authentication (`/auth`)
-| Method | Path | Deskripsi |
-| :--- | :--- | :--- |
-| `POST` | `/register` | Mendaftar user baru |
-| `POST` | `/token` | Login untuk mendapatkan Access Token |
-| `GET` | `/verify` | Verifikasi email (link dari email) |
-| `GET` | `/myprofile` | Melihat data user yang sedang login |
-
-### Notes (`/notes`)
-| Method | Path | Deskripsi |
-| :--- | :--- | :--- |
-| `POST` | `/notes/` | Membuat catatan baru |
-| `GET` | `/notes/` | Melihat daftar catatan (support pagination) |
-| `PUT` | `/notes/{id}` | Edit catatan |
-| `DELETE` | `/notes/{id}`| Hapus catatan |
+| Fitur | Method | Path | Deskripsi |
+| :--- | :--- | :--- | :--- |
+| **Auth** | `POST` | `/auth/register` | Daftar akun baru |
+| | `POST` | `/auth/token` | Login (Dapat Access Token) |
+| | `POST` | `/auth/forgot-password` | Request link reset password |
+| **Notes** | `GET` | `/notes/?q={kw}&page=1` | Cari & lihat catatan |
+| | `POST` | `/notes/` | Buat catatan baru |
+| **Files** | `POST` | `/files/upload` | Upload file ke Cloud |
+| | `GET` | `/files/` | Lihat list file saya |
+| | `DELETE` | `/files/{id}` | Hapus file permanen |
 
 ---
 
-## ⚙️ Cara Install & Deploy
+## ⚙️ Cara Menjalankan (Local Development)
 
-Silahkan baca panduan lengkap deployment di file terpisah:
-👉 **[BACA PANDUAN DEPLOY (DEPLOY_GUIDE.md)](DEPLOY_GUIDE.md)**
+### 1. Setup Backend
+```bash
+cd backend
+# Buat Virtual Environment
+python -m venv venv
+# Windows:
+venv\Scripts\activate
+# Install Dependencies
+pip install -r requirements.txt
+# Jalankan Server
+uvicorn backend.main:app --reload
+```
+
+### 2. Setup Frontend
+```bash
+cd frontend
+# Install Modules
+npm install
+# Jalankan Website
+npm run dev
+```
+
+### 3. Konfigurasi (.env)
+Pastikan membuat file `.env` di root folder dengan isi:
+```env
+# Backend
+SECRET_KEY=isi_bebas_rahasia
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=60
+FRONTEND_URL=http://localhost:5173
+
+# Email (SMTP)
+MAIL_USERNAME=email@gmail.com
+MAIL_PASSWORD=app_password_google
+```
+
+---
+
+## 📄 Deployment
+Panduan lengkap untuk deploy ke server (VPS/Railway) tersedia di:
+👉 **[DEPLOY_GUIDE.md](DEPLOY_GUIDE.md)**

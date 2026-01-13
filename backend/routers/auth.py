@@ -31,6 +31,9 @@ from backend.dependencies import (
 # Setup logging
 logger = logging.getLogger(__name__)
 
+# Konfigurasi URL Frontend (dari .env)
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+
 router = APIRouter(tags=["Authentication"])
 
 @router.post("/register", response_model=UserRead)
@@ -118,7 +121,7 @@ def verify_email(token: str, session: Session = Depends(get_session)):
     if user.is_active:
         logger.info(f"User already verified: {user.email}")
         # REDIRECT KE FRONTEND (Root URL karena Login ada di /)
-        return RedirectResponse("http://localhost:5173/?verified=true", status_code=302)
+        return RedirectResponse(f"{FRONTEND_URL}/?verified=true", status_code=302)
 
     try:
         user.is_active = True
@@ -127,7 +130,7 @@ def verify_email(token: str, session: Session = Depends(get_session)):
         logger.info(f"User verified successfully: {user.email}")
 
         # REDIRECT KE FRONTEND (Root URL)
-        return RedirectResponse("http://localhost:5173/?verified=true", status_code=302)
+        return RedirectResponse(f"{FRONTEND_URL}/?verified=true", status_code=302)
         
     except Exception as e:
         session.rollback()

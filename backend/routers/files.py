@@ -56,6 +56,15 @@ async def upload_file(
          logger.warning(f"Upload Ditolak! Tipe: {file.content_type}, Ext: {file_ext}")
          raise HTTPException(status_code=400, detail=f"File tidak didukung. Terdeteksi: {file.content_type} ({file_ext})")
 
+    # 1.5 Validasi Ukuran File (Server-Side, Max 5MB)
+    MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB in bytes
+    contents = await file.read()
+    if len(contents) > MAX_FILE_SIZE:
+        logger.warning(f"Upload Ditolak! Ukuran: {len(contents)} bytes (Max: {MAX_FILE_SIZE})")
+        raise HTTPException(status_code=400, detail=f"Ukuran file terlalu besar. Maksimal 5MB.")
+    # Reset file pointer untuk proses selanjutnya
+    await file.seek(0)
+
     # 2. Buat Nama Unik (UUID) tapi tetap simpan nama asli
     unique_filename = f"{current_user.id}_{uuid.uuid4()}{file_ext}"
     file_location = f"{UPLOAD_DIR}/{unique_filename}"

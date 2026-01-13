@@ -15,7 +15,7 @@ class Note(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     title   : str = Field(max_length=100)
     content: str = Field(max_length=10000)
-    owner_id: Optional[int] = Field(foreign_key="user.id")
+    owner_id: Optional[int] = Field(foreign_key="user.id", index=True)
     
     # Penanda Waktu (untuk fitur sorting)
     created_at: datetime = Field(default_factory=datetime.utcnow)
@@ -26,5 +26,5 @@ class UserFile(SQLModel, table=True):
     filename: str = Field(max_length=255)
     file_url: str = Field(max_length=500)
     file_type: str = Field(max_length=50) # pdf, image, docx
-    owner_id: Optional[int] = Field(foreign_key="user.id")
+    owner_id: Optional[int] = Field(foreign_key="user.id", index=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
