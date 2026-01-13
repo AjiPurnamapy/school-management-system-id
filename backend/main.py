@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from starlette.middleware.sessions import SessionMiddleware
-from backend.routers import notes, auth, files
+from backend.routers import notes, auth, files, classes
 from backend.database import engine
 from backend.admin import setup_admin
 from slowapi import _rate_limit_exceeded_handler
@@ -99,6 +99,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.include_router(auth.router)
 app.include_router(notes.router)
 app.include_router(files.router) # Router Storage
+app.include_router(classes.router) # Router Kelas Sekolah
 
 # pasang admin panel
 setup_admin(app, engine)

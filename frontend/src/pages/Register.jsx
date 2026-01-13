@@ -65,7 +65,7 @@ const Register = () => {
                 
                 {error && <div className="text-danger mb-4">{error}</div>}
 
-                <form onSubmit={handleRegister}>
+                <form onSubmit={handleRegister} autoComplete="off">
                     <div className="form-group">
                         <label className="form-label">Full Name</label>
                         <input 
@@ -88,6 +88,7 @@ const Register = () => {
                             onChange={handleChange}
                             placeholder="name@example.com"
                             required
+                            autoComplete="off"
                         />
                     </div>
                     <div className="form-group">
@@ -113,6 +114,7 @@ const Register = () => {
                             onChange={handleChange}
                             placeholder="Min. 8 characters"
                             required
+                            autoComplete="new-password"
                         />
                     </div>
 

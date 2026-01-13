@@ -5,7 +5,7 @@ from sqladmin import Admin, ModelView
 from sqladmin.authentication import AuthenticationBackend
 from starlette.requests import Request
 from starlette.responses import RedirectResponse
-from backend.models import User, Note
+from backend.models import User, Note, UserFile, SchoolClass
 
 load_dotenv()
 USERNAME_ADMIN = os.getenv("USERNAME_ADMIN")
@@ -66,11 +66,18 @@ else:
         
 
     class UserAdmin(ModelView, model=User):
-        column_list = [User.id, User.email, User.name, User.age]  # field (kolom) yang ingin di tampilkan
+        column_list = [User.id, User.email, User.name, User.role, User.class_id, User.is_active]
         can_create = True
         can_delete = True
         can_edit = True
-        icon = "fa-solid fa-user"  # untuk ikon
+        icon = "fa-solid fa-user"
+
+    class SchoolClassAdmin(ModelView, model=SchoolClass):
+        column_list = [SchoolClass.id, SchoolClass.name, SchoolClass.grade_level, SchoolClass.wali_kelas_id]
+        can_create = True
+        can_edit = True
+        can_delete = True
+        icon = "fa-solid fa-school"
 
     class NotesAdmin(ModelView, model=Note):
         column_list = [Note.id, Note.title, Note.content, Note.owner_id]
@@ -79,10 +86,19 @@ else:
         can_delete = True
         icon = "fa-solid fa-book"
 
+    class UserFileAdmin(ModelView, model=UserFile):
+        column_list = [UserFile.id, UserFile.filename, UserFile.file_type, UserFile.owner_id]
+        can_create = False 
+        can_edit = True
+        can_delete = True
+        icon = "fa-solid fa-file"
+
     def setup_admin(app, engine):
         # inisialisasi keamanan (kunci untuk session browser)
         authentication_backend = AdminAuth(secret_key=SECRET_KEY_ADMIN)
 
         admin = Admin(app, engine, authentication_backend=authentication_backend)
         admin.add_view(UserAdmin)
+        admin.add_view(SchoolClassAdmin)
         admin.add_view(NotesAdmin)
+        admin.add_view(UserFileAdmin)

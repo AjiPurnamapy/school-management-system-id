@@ -25,6 +25,7 @@ load_dotenv(dotenv_path=env_path)
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = os.getenv("ALGORITHM")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 30)) # batas waktu penggunaan token (menit)
+SECURITY_PEPPER = os.getenv("SECURITY_PEPPER", "") # Pepper Rahasia
 
 if not SECRET_KEY:
     raise ValueError("FATAL ERROR: SECRET_KEY tidak ditemukan di file .env!")
@@ -34,10 +35,10 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 def get_password_hash(password: str) -> str : # ' -> ' keluaran berupa string
-    return pwd_context.hash(password)
+    return pwd_context.hash(password + SECURITY_PEPPER)
 
 def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
+    return pwd_context.verify(plain_password + SECURITY_PEPPER, hashed_password)
 
 def create_access_token(data: dict):
     to_encode = data.copy()
