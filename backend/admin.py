@@ -13,7 +13,7 @@ PASSWORD_ADMIN = os.getenv("PASSWORD_ADMIN")
 TOKEN_ADMIN = os.getenv("TOKEN_ADMIN")
 SECRET_KEY_ADMIN = os.getenv("SECRET_KEY_ADMIN_SESSION")
 MAX_SESSION_TIME = 3600 
-# cek kelengkapan konfigurasi
+
 # Cek kelengkapan konfigurasi
 config_complete = all([USERNAME_ADMIN, PASSWORD_ADMIN, TOKEN_ADMIN, SECRET_KEY_ADMIN])
 
@@ -67,6 +67,8 @@ else:
 
     class UserAdmin(ModelView, model=User):
         column_list = [User.id, User.email, User.name, User.role, User.class_id, User.is_active]
+        # Sembunyikan relasi Notes & Files dari Form Edit agar tidak berat/membingungkan
+        form_excluded_columns = [User.notes, User.files]
         can_create = True
         can_delete = True
         can_edit = True

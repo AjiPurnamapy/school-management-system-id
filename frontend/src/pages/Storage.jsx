@@ -93,13 +93,31 @@ const Storage = () => {
     };
 
     return (
-        <div className="storage-container">
-            <div className="flex-between mb-4">
-                <h2 className="mb-0">Cloud Storage ☁️</h2>
+        <div className="glass-card p-6" style={{ minHeight: '80vh' }}>
+            <div className="flex-between align-center mb-8">
+                <div>
+                     <h2 className="mb-1" style={{ fontSize: '2rem', fontWeight: '800', color: '#1e293b' }}>
+                        Cloud Storage ☁️
+                     </h2>
+                     <p className="text-muted m-0">Simpan dan bagikan materi pembelajaran.</p>
+                </div>
                 
                 <div className="upload-btn-wrapper">
-                    <label className={`btn-primary ${uploading ? 'disabled' : ''}`} style={{cursor: 'pointer', display: 'inline-block', width: 'auto', padding: '10px 20px'}}>
-                        {uploading ? 'Uploading...' : '📤 Upload File'}
+                    <label className={`btn-primary ${uploading ? 'disabled' : ''}`} style={{
+                        cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', 
+                        width: 'auto', padding: '12px 24px', background: '#4f46e5',
+                        boxShadow: '0 4px 12px rgba(79, 70, 229, 0.2)'
+                    }}>
+                        {uploading ? (
+                            <>
+                                <div className="spinner" style={{width:'20px', height:'20px', border:'2px solid white', borderTop:'2px solid transparent'}}></div>
+                                <span>Uploading...</span>
+                            </>
+                        ) : (
+                            <>
+                                📤 <span>Upload File</span>
+                            </>
+                        )}
                         <input 
                             type="file" 
                             hidden 
@@ -112,45 +130,52 @@ const Storage = () => {
             </div>
 
             {loading ? (
-                <div className="text-center text-muted mt-5">Loading files...</div>
+                <div className="flex-center p-20 flex-col text-slate-400">
+                    <div className="spinner mb-4"></div>
+                    <p>Memuat file...</p>
+                </div>
             ) : files.length === 0 ? (
-                <div className="text-center text-muted mt-5">
-                    <p style={{fontSize: '3rem'}}>📭</p>
-                    <p>Belum ada file tersimpan.</p>
+                <div className="text-center py-20 px-6 bg-slate-50 rounded-2xl border border-dashed border-slate-300">
+                    <div style={{ fontSize: '4rem', marginBottom: '15px', color: '#cbd5e1' }}>📭</div>
+                    <p className="text-slate-500 text-lg font-medium">Belum ada file tersimpan.</p>
+                    <p className="text-slate-400 text-sm">Upload materi agar siswa bisa mengaksesnya.</p>
                 </div>
             ) : (
-                <div className="file-grid" style={{ 
+                <div className="file-grid animate-fade-in" style={{ 
                     display: 'grid', 
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', 
-                    gap: '20px' 
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', 
+                    gap: '20px',
+                    padding: '10px 0' 
                 }}>
-                    {files.map(file => (
-                        <div key={file.id} className="glass-card text-center p-3" style={{position: 'relative'}}>
-                            <div style={{fontSize: '3rem', marginBottom: '10px'}}>
-                                {getFileIcon(file.file_type)}
-                            </div>
-                            <h5 style={{fontSize: '0.9rem', wordBreak: 'break-all', marginBottom: '15px'}}>
-                                {file.filename}
-                            </h5>
-                            
-                            <div className="flex-center gap-2">
-                                <a 
-                                    href={getDownloadUrl(file.file_url)} 
-                                    target="_blank" 
-                                    rel="noreferrer"
-                                    className="btn-sm btn-outline-primary text-decoration-none"
-                                    style={{fontSize: '1.2rem'}}
-                                    download 
-                                >
-                                    ⬇️
-                                </a>
-                                <button 
-                                    onClick={() => handleDelete(file.id)}
-                                    className="btn-sm btn-outline-danger"
-                                    style={{border: 'none', background: 'transparent', color: '#dc3545', fontSize: '1.2rem', cursor: 'pointer'}}
-                                >
-                                    🗑️
-                                </button>
+                    {files.map((file, index) => (
+                        <div key={file.id} className="glass-card hover-card" style={{ padding: '20px', position: 'relative', transition: 'all 0.2s', borderLeft: '4px solid #4f46e5', animationDelay: `${index * 50}ms` }}>
+                            <div className="flex-between align-start">
+                                <div style={{ marginRight: '10px', width: '100%', overflow: 'hidden' }}>
+                                    <h3 className="mt-0 text-lg mb-1 font-bold text-slate-800 line-clamp-1" title={file.filename}>
+                                        {getFileIcon(file.file_type)} {file.filename}
+                                    </h3>
+                                    <small className="text-muted flex align-center gap-1">
+                                        🕒 {new Date(file.created_at || Date.now()).toLocaleDateString('id-ID', {day: 'numeric', month: 'short', year: 'numeric'})}
+                                    </small>
+                                </div>
+                                
+                                <div style={{ display:'flex', gap:'8px' }}>
+                                    <a 
+                                        href={getDownloadUrl(file.file_url)} 
+                                        target="_blank" 
+                                        rel="noreferrer"
+                                        download
+                                        style={{ background: '#eff6ff', border: 'none', cursor: 'pointer', width:'32px', height:'32px', borderRadius:'8px', display:'flex', alignItems:'center', justifyContent:'center', textDecoration:'none' }}
+                                        className="hover:bg-blue-100"
+                                        title="Download File"
+                                    >⬇️</a>
+                                    <button 
+                                        onClick={() => handleDelete(file.id)}
+                                        style={{ background: '#fef2f2', border: 'none', cursor: 'pointer', width:'32px', height:'32px', borderRadius:'8px', display:'flex', alignItems:'center', justifyContent:'center', color: '#ef4444' }}
+                                        className="hover:bg-red-100"
+                                        title="Hapus File"
+                                    >🗑️</button>
+                                </div>
                             </div>
                         </div>
                     ))}

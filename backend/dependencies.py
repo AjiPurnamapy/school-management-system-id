@@ -10,6 +10,10 @@ from backend.database import get_session
 from backend.models import User
 from pathlib import Path
 
+# ... (existing imports)
+
+
+
 # cari lokasi file ini (dependencies.py) berada
 current_file_path = Path(__file__).resolve()
 
@@ -70,3 +74,4 @@ def get_current_user(token: str = Depends(oauth2_scheme),
     if user is None:
         raise credentials_exception
     return user
+

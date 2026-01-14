@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import Storage from './Storage';
+import Classes from './Classes';
+import Subjects from './Subjects';
+import Schedules from './Schedules';
 
 const Dashboard = () => {
     const [notes, setNotes] = useState([]);
@@ -17,6 +20,7 @@ const Dashboard = () => {
     
     // UI State
     const [activeTab, setActiveTab] = useState('notes'); // 'notes' or 'storage'
+    const [showNoteForm, setShowNoteForm] = useState(false); // Modal visibility
     
     // Pagination State
     const [currentPage, setCurrentPage] = useState(1);
@@ -106,12 +110,14 @@ const Dashboard = () => {
             } else {
                 // MODE CREATE
                 await axios.post('/notes/', { title, content }, { headers: { Authorization: `Bearer ${token}` }});
+                alert("Catatan berhasil dibuat!");
             }
             
-            // Reset Form
+            // Reset Form & Close Modal
             setTitle(''); 
             setContent('');
             setEditId(null);
+            setShowNoteForm(false);
             
             // Refresh data
             fetchData(); 
@@ -126,15 +132,14 @@ const Dashboard = () => {
         setTitle(note.title);
         setContent(note.content);
         setEditId(note.id);
-        setActiveTab('notes'); // Switch to notes tab if editing
-        // Scroll ke atas (opsional) agar user sadar form sudah terisi
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        setShowNoteForm(true); // Open Modal
     };
 
     const handleCancelEdit = () => {
         setTitle('');
         setContent('');
         setEditId(null);
+        setShowNoteForm(false);
     };
 
     const handleDeleteNote = async (noteId) => {
@@ -231,7 +236,18 @@ const Dashboard = () => {
                     </div>
                     <div>
                         <h1 className="mb-0 text-xl">Halo, {user?.name || 'User'}! 👋</h1>
-                        <p className="text-muted mb-0">{user?.email}</p>
+                        <div className="flex-center gap-2 align-center justify-start">
+                            <p className="text-muted mb-0">{user?.email}</p>
+                            {user?.role && (
+                                <span style={{ 
+                                    background: user.role === 'student' ? '#eef2ff' : '#dcfce7', 
+                                    color: user.role === 'student' ? '#4f46e5' : '#166534',
+                                    padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight:'bold', textTransform:'uppercase'
+                                }}>
+                                    {user.role}
+                                </span>
+                            )}
+                        </div>
                     </div>
                 </div>
                 <button onClick={handleLogout} className="btn-primary" style={{ width: 'auto', background: '#dc3545', padding: '10px 20px' }}>Logout</button>
@@ -239,7 +255,7 @@ const Dashboard = () => {
 
             <div className="dashboard-content">
                 
-                {/* Kolom Kiri: Sidebar Menu + Notes Form */}
+                {/* Kolom Kiri: Sidebar Menu ONLY */}
                 <div className="glass-card dashboard-sidebar">
                     
                     {/* NAVIGATION MENU */}
@@ -258,60 +274,41 @@ const Dashboard = () => {
                         >
                             ☁️ Cloud Storage
                         </button>
+                        
+                        {(user?.role === 'teacher' || user?.role === 'admin') && (
+                            <>
+                            <button 
+                                onClick={() => setActiveTab('classes')}
+                                className="btn-primary"
+                                style={activeTab === 'classes' ? {} : {background:'transparent', color:'#4f46e5', border:'1px solid #4f46e5'}}
+                            >
+                                🏫 Classes
+                            </button>
+                            <button 
+                                onClick={() => setActiveTab('subjects')}
+                                className="btn-primary"
+                                style={activeTab === 'subjects' ? {} : {background:'transparent', color:'#4f46e5', border:'1px solid #4f46e5'}}
+                            >
+                                📚 Subjects
+                            </button>
+                            <button 
+                                onClick={() => setActiveTab('schedules')}
+                                className="btn-primary"
+                                style={activeTab === 'schedules' ? {} : {background:'transparent', color:'#4f46e5', border:'1px solid #4f46e5'}}
+                            >
+                                🗓️ Schedules
+                            </button>
+                            </>
+                        )}
                     </div>
 
                     <hr className="mb-4" style={{borderTop: '1px solid #eee'}}/>
-
-                   {/* Form CREATE NOTE (Hanya Muncul di Tab Notes) */}
-                   {activeTab === 'notes' && (
-                       <>
-                        <h3 className="mt-0">{editId ? '✏️ Edit Note' : '+ New Note'}</h3>
-                        <p className="text-muted text-sm mb-4">
-                            {editId ? 'Silahkan edit catatan Anda.' : 'Tulis idemu di sini agar tidak lupa.'}
-                        </p>
-                        <form onSubmit={handleSaveNote}>
-                            <div className="form-group">
-                                <label className="form-label">
-                                    Title <small className="text-muted font-normal">(min. 3 chars)</small>
-                                </label>
-                                <input 
-                                    type="text" className="form-control"
-                                    value={title} onChange={(e) => setTitle(e.target.value)} 
-                                    minLength={3} placeholder="Judul catatan..." required 
-                                />
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">
-                                    Content <small className="text-muted font-normal">(min. 4 chars)</small>
-                                </label>
-                                <textarea 
-                                    className="form-control" rows="8"
-                                    value={content} onChange={(e) => setContent(e.target.value)} 
-                                    minLength={4} placeholder="Isi catatan..." required 
-                                ></textarea>
-                            </div>
-                            
-                            <div className="flex-between gap-2">
-                                {editId && (
-                                    <button type="button" onClick={handleCancelEdit} className="btn-primary" style={{ background: '#6c757d' }}>
-                                        Cancel
-                                    </button>
-                                )}
-                                <button type="submit" className="btn-primary">
-                                    {editId ? 'Update Note' : 'Save Note'}
-                                </button>
-                            </div>
-                        </form>
-                       </>
-                   )}
-
-                   {/* Info Panel untuk Storage */}
-                   {activeTab === 'storage' && (
-                       <div className="text-center text-muted">
-                           <p>Simpan file penting Anda di sini.</p>
-                           <small>Support: PDF, DOCX, JPG, PNG</small>
-                       </div>
-                   )}
+                     {activeTab === 'storage' && (
+                        <div className="text-center text-muted">
+                            <p>Simpan file penting Anda di sini.</p>
+                            <small>Support: PDF, DOCX, JPG, PNG</small>
+                        </div>
+                    )}
                 </div>
 
                 {/* Kolom Kanan: Daftar Notes */}
@@ -320,7 +317,7 @@ const Dashboard = () => {
                     {activeTab === 'notes' ? (
                         <>
                     
-                     <div className="glass-card dashboard-toolbar">
+                     <div className="glass-card dashboard-toolbar mb-4">
                         <div style={{ flex: 1, display: 'flex', alignItems: 'center', background: 'white', padding: '0 15px', borderRadius: '12px', border: '1px solid #ddd' }}>
                             <span style={{ fontSize: '1.2rem', marginRight: '10px' }}>🔍</span>
                             <input type="text" placeholder="Cari catatan..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ border: 'none', outline: 'none', width: '100%', padding: '12px 0', fontSize: '1rem' }} />
@@ -331,29 +328,43 @@ const Dashboard = () => {
                         </select>
                     </div>
 
-                    <div className="flex-between mb-4">
-                        <h2 className="mb-0">Your Collection 📚</h2>
-                        <span style={{ background: '#eef2ff', padding: '5px 12px', borderRadius: '20px', color: '#4f46e5', fontWeight: 'bold', fontSize: '0.9rem' }}>
-                            {notes.length} Notes
-                        </span>
+                    <div className="flex-between mb-4 align-center">
+                        <div className="flex align-center gap-3">
+                            <h2 className="mb-0 text-2xl font-bold text-slate-800">Your Collection 📚</h2>
+                            <span style={{ background: '#eef2ff', padding: '5px 12px', borderRadius: '20px', color: '#4f46e5', fontWeight: 'bold', fontSize: '0.9rem' }}>
+                                {notes.length} Notes
+                            </span>
+                        </div>
+                        <button 
+                            onClick={() => {
+                                setEditId(null);
+                                setTitle('');
+                                setContent('');
+                                setShowNoteForm(true);
+                            }}
+                            className="btn-primary animate-bounce-subtle"
+                            style={{ width: 'auto', padding: '12px 24px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 15px rgba(79, 70, 229, 0.3)' }}
+                        >
+                            ➕ Tambah Catatan
+                        </button>
                     </div>
 
-                    <div className="dashboard-grid">
+                    <div className="dashboard-grid fade-in-up">
                         {notes.length === 0 && (
-                            <div className="glass-card text-center p-5 opacity-80">
-                                <div style={{ fontSize: '3rem', marginBottom: '10px' }}>🕵️‍♀️</div>
-                                <p>Tidak ada catatan yang ditemukan.</p>
-                                {searchQuery && <p className="text-danger">Coba kata kunci lain?</p>}
+                            <div className="glass-card text-center p-10 opacity-80 col-span-full">
+                                <div style={{ fontSize: '4rem', marginBottom: '15px' }}>📝</div>
+                                <h3 className="text-xl text-slate-600 font-bold mb-2">Belum ada catatan</h3>
+                                <p className="text-slate-400">Buat catatan pertamamu sekarang!</p>
                             </div>
                         )}
                         {notes.map((note) => (
-                            <div key={note.id} className="glass-card" style={{ padding: '25px', position: 'relative' }}>
+                            <div key={note.id} className="glass-card hover-card" style={{ padding: '25px', position: 'relative', transition: 'all 0.2s', borderLeft: '4px solid #4f46e5' }}>
                                 <div className="flex-between align-start">
-                                    <div style={{ marginRight: '10px' }}>
-                                        <h3 className="mt-0 text-lg mb-1">{note.title}</h3>
+                                    <div style={{ marginRight: '10px', width: '100%' }}>
+                                        <h3 className="mt-0 text-lg mb-1 font-bold text-slate-800 line-clamp-1">{note.title}</h3>
                                         {note.created_at && (
-                                            <small className="text-muted">
-                                                {new Date(note.created_at + 'Z').toLocaleDateString('id-ID', {day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute:'2-digit'})}
+                                            <small className="text-muted flex align-center gap-1">
+                                                🕒 {new Date(note.created_at + 'Z').toLocaleDateString('id-ID', {day: 'numeric', month: 'short', year: 'numeric'})}
                                             </small>
                                         )}
                                     </div>
@@ -361,19 +372,22 @@ const Dashboard = () => {
                                     <div style={{ display:'flex', gap:'8px' }}>
                                         <button 
                                             onClick={() => handleEdit(note)}
-                                            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem', filter: 'grayscale(1)', transition: 'filter 0.2s', padding:'0' }}
-                                            className="hover-color"
+                                            style={{ background: '#f1f5f9', border: 'none', cursor: 'pointer', width:'32px', height:'32px', borderRadius:'8px', display:'flex', alignItems:'center', justifyContent:'center' }}
+                                            className="hover:bg-slate-200"
                                             title="Edit Note"
                                         >✏️</button>
                                         <button 
                                             onClick={() => handleDeleteNote(note.id)}
-                                            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem', color: '#ff6b6b', padding: '0' }}
+                                            style={{ background: '#fef2f2', border: 'none', cursor: 'pointer', width:'32px', height:'32px', borderRadius:'8px', display:'flex', alignItems:'center', justifyContent:'center', color: '#ef4444' }}
+                                            className="hover:bg-red-100"
                                             title="Delete Note"
                                         >🗑️</button>
                                     </div>
                                 </div>
                                 <hr style={{ border: '0', borderTop: '1px solid rgba(0,0,0,0.05)', margin: '15px 0' }}/>
-                                <p style={{ color: '#444', lineHeight: '1.6', fontSize: '0.95rem', whiteSpace: 'pre-wrap', overflowWrap: 'break-word', wordBreak: 'break-word' }}>{note.content}</p>
+                                <p style={{ color: '#475569', lineHeight: '1.6', fontSize: '0.95rem', whiteSpace: 'pre-wrap', overflowWrap: 'break-word', wordBreak: 'break-word', height: '60px', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>
+                                    {note.content}
+                                </p>
                             </div>
                         ))}
                     </div>
@@ -404,10 +418,65 @@ const Dashboard = () => {
                             </button>
                         </div>
                     )}
-                {/* End of Notes Tab Content */}
+
+                    {/* MODAL FORM */}
+                    {showNoteForm && (
+                        <div style={{
+                            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                            background: 'rgba(15, 23, 42, 0.6)', 
+                            backdropFilter: 'blur(4px)',
+                            zIndex: 1000,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center'
+                        }}>
+                             <div className="glass-card animate-slide-down" style={{ width: '600px', maxWidth: '90%', background: 'white', padding: '30px', borderRadius: '20px', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)' }}>
+                                <div className="flex-between align-center mb-6">
+                                    <h3 className="m-0 text-2xl font-bold text-slate-800">{editId ? '✏️ Edit Catatan' : '📝 Catatan Baru'}</h3>
+                                    <button onClick={handleCancelEdit} style={{ background: 'transparent', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: '#94a3b8' }}>&times;</button>
+                                </div>
+                                
+                                <form onSubmit={handleSaveNote}>
+                                    <div className="form-group mb-4">
+                                        <label className="form-label font-bold text-slate-600 mb-2 block">Judul Catatan</label>
+                                        <div className="form-input-wrapper">
+                                            <input 
+                                                type="text" className="form-control"
+                                                value={title} onChange={(e) => setTitle(e.target.value)} 
+                                                minLength={3} placeholder="Contoh: Ide Project Baru..." required 
+                                                style={{ padding: '12px', fontSize: '1rem', width: '100%', borderRadius: '10px', border: '1px solid #e2e8f0' }}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="form-group mb-6">
+                                        <label className="form-label font-bold text-slate-600 mb-2 block">Isi Catatan</label>
+                                        <textarea 
+                                            className="form-control" rows="8"
+                                            value={content} onChange={(e) => setContent(e.target.value)} 
+                                            minLength={4} placeholder="Tulis detail catatanmu di sini..." required 
+                                            style={{ padding: '12px', fontSize: '1rem', width: '100%', borderRadius: '10px', border: '1px solid #e2e8f0', resize: 'vertical' }}
+                                        ></textarea>
+                                    </div>
+                                    
+                                    <div className="flex justify-end gap-3">
+                                        <button type="button" onClick={handleCancelEdit} className="btn-primary" style={{ background: '#f1f5f9', color: '#64748b', width: 'auto', padding: '12px 24px' }}>
+                                            Batal
+                                        </button>
+                                        <button type="submit" className="btn-primary" style={{ width: 'auto', padding: '12px 30px', boxShadow: '0 4px 6px -1px rgba(79, 70, 229, 0.2)' }}>
+                                            {editId ? 'Update Catatan' : 'Simpan Catatan'}
+                                        </button>
+                                    </div>
+                                </form>
+                             </div>
+                        </div>
+                    )}
                         </>
-                    ) : (
+                    ) : activeTab === 'storage' ? (
                         <Storage />
+                    ) : activeTab === 'subjects' ? (
+                        <Subjects />
+                    ) : activeTab === 'schedules' ? (
+                        <Schedules />
+                    ) : (
+                        <Classes />
                     )}
                 </div>
             </div>

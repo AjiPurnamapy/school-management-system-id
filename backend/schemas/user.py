@@ -31,6 +31,8 @@ class UserCreate(BaseUser):
 class UserRead(BaseUser):
     id: int
     profile_image: Optional[str] = None
+    role: str = "student"
+    class_id: Optional[int] = None
 
 class ForgotPasswordRequest(SQLModel):
     email: EmailStr = Field(max_length=100)

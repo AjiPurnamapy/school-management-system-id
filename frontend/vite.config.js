@@ -23,6 +23,10 @@ export default defineConfig({
       '/reset-password': 'http://localhost:8000',
       '/files': 'http://localhost:8000',
       '/static': 'http://localhost:8000',
+      '/classes': 'http://localhost:8000',
+      '/users': 'http://localhost:8000',
+      '/subjects': 'http://localhost:8000',
+      '/schedules': 'http://localhost:8000',
     }
   }
 })

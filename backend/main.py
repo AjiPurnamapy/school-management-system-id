@@ -9,8 +9,8 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from starlette.middleware.sessions import SessionMiddleware
-from backend.routers import notes, auth, files, classes
-from backend.database import engine
+from backend.routers import notes, auth, files, classes, users, subjects, schedules
+from backend.database import engine, create_db_and_tables
 from backend.admin import setup_admin
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -41,9 +41,10 @@ logger = logging.getLogger(__name__)
 # Lifespan
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    create_db_and_tables() # Create tables if not exists
     logger.info("🚀 Server Sedang Menyala...")
-    logger.info("🛑 Server dimatikan.")
     yield
+    logger.info("🛑 Server dimatikan.")
 
 app = FastAPI(
     title="Notes API Service",
@@ -100,6 +101,9 @@ app.include_router(auth.router)
 app.include_router(notes.router)
 app.include_router(files.router) # Router Storage
 app.include_router(classes.router) # Router Kelas Sekolah
+app.include_router(users.router)   # Router Users
+app.include_router(subjects.router) # Router Mapel
+app.include_router(schedules.router) # Router Jadwal
 
 # pasang admin panel
 setup_admin(app, engine)

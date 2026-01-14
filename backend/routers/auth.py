@@ -13,6 +13,7 @@ from sqlalchemy.exc import IntegrityError
 from backend.database import get_session
 
 # ... (imports lainnya tetap sama, jangan dihapus) 
+from backend.schemas.user import ForgotPasswordRequest, ResetPasswordRequest
 from backend.schemas.user import UserCreate, UserRead
 from backend.schemas.token import Token
 from backend.models import User
@@ -220,11 +221,8 @@ async def upload_photo(
     
     return {"filename": file.filename, "url": image_url}
 
-# ================================
-# FORGOT PASSWORD (REAL EMAIL)
-# ================================
-from backend.schemas.user import ForgotPasswordRequest, ResetPasswordRequest
 
+# FORGOT PASSWORD (REAL EMAIL)
 @router.post("/forgot-password")
 def forgot_password(
     request: ForgotPasswordRequest,

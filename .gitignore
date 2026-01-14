@@ -19,6 +19,7 @@ env/
 # Folder Static (Gambar User)
 backend/static/images/
 backend/static/files/
+backup/
 
 # NODE / FRONTEND
 node_modules/

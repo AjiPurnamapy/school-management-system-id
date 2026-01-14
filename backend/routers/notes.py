@@ -45,32 +45,32 @@ def read_my_notes(
     session: Session = Depends(get_session),
     current_user : User = Depends(get_current_user),
 ):
-    # 1. BASE STATEMENT (User Filter)
+    # BASE STATEMENT (User Filter)
     base_statement = select(Note).where(Note.owner_id == current_user.id)
 
-    # 2. FILTER PENCARIAN
+    # FILTER PENCARIAN
     if q:
         base_statement = base_statement.where(
             col(Note.title).contains(q) | col(Note.content).contains(q)
         )
 
-    # 3. HITUNG TOTAL DATA (Sebelum dipotong pagination)
+    # HITUNG TOTAL DATA (Sebelum dipotong pagination)
     # Kita butuh info "Total 50 data" agar frontend tau ada berapa halaman.
     # Note: Kita gunakan count() dari library sqlmodel
     total_statement = select(func.count()).select_from(base_statement.subquery())
     total_items = session.exec(total_statement).one()
 
-    # 4. PENGURUTAN (Sorting)
+    # PENGURUTAN (Sorting)
     if sort_by == "date_desc":
         base_statement = base_statement.order_by(desc(Note.created_at))
     elif sort_by == "date_asc":
         base_statement = base_statement.order_by(asc(Note.created_at))
 
-    # 5. PAGINATION (Potong Data)
+    # PAGINATION (Potong Data)
     paginated_statement = base_statement.offset(offset).limit(limit)
     data = session.exec(paginated_statement).all()
 
-    # 6. HITUNG INFO HALAMAN
+    # HITUNG INFO HALAMAN
     # Rumus Total Halaman: Total Data / Limit (dibulatkan ke atas)
     # Contoh: 12 data / 10 limit = 1.2 -> jadi 2 halaman
     # Jika total_items 0, maka total_pages 0 atau 1 (kita set 1 minimal agar tidak error)

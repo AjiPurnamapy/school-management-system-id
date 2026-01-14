@@ -20,6 +20,7 @@ from backend.database import get_session
 from backend.models import SchoolClass, User, UserRole
 from backend.schemas.class_schema import ClassCreate, ClassUpdate, ClassRead, AssignStudentRequest
 from backend.dependencies import get_current_user
+from backend.permissions import require_admin
 
 # Setup Logging
 logger = logging.getLogger(__name__)
@@ -28,35 +29,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/classes", tags=["Classes (Kelas)"])
 
 
-# =============================================================================
-#                           HELPER: CEK AKSES ADMIN
-# =============================================================================
-def require_admin(current_user: User = Depends(get_current_user)) -> User:
-    """
-    Dependency untuk memastikan hanya Admin yang bisa akses endpoint ini.
-    
-    Cara Kerja:
-    1. Ambil user yang sedang login dari token JWT.
-    2. Cek apakah role-nya adalah 'admin'.
-    3. Jika bukan, tolak dengan HTTP 403 Forbidden.
-    
-    Penggunaan:
-        @router.post("/")
-        def create_class(admin: User = Depends(require_admin)):
-            ...
-    """
-    if current_user.role != UserRole.admin.value:
-        logger.warning(f"Akses ditolak: User '{current_user.name}' (role: {current_user.role}) mencoba akses admin.")
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Akses ditolak. Hanya Admin yang bisa melakukan aksi ini."
-        )
-    return current_user
 
-
-# =============================================================================
-#                           ENDPOINT: CREATE CLASS
-# =============================================================================
 @router.post("/", response_model=ClassRead, status_code=status.HTTP_201_CREATED,
     summary="Buat Kelas Baru",
     description="Membuat kelas baru. Hanya Admin yang bisa akses endpoint ini."
@@ -106,9 +79,7 @@ def create_class(
     return new_class
 
 
-# =============================================================================
-#                           ENDPOINT: GET ALL CLASSES
-# =============================================================================
+# ENDPOINT UNTUK MELIHAT SEMUA KELAS
 @router.get("/", response_model=List[ClassRead],
     summary="Lihat Semua Kelas",
     description="Menampilkan daftar semua kelas. Bisa diakses oleh semua user yang login."
@@ -125,9 +96,7 @@ def get_all_classes(
     return classes
 
 
-# =============================================================================
-#                           ENDPOINT: GET CLASS BY ID
-# =============================================================================
+# ENDPOINT: GET CLASS BY ID
 @router.get("/{class_id}", response_model=ClassRead,
     summary="Lihat Detail Kelas",
     description="Menampilkan detail satu kelas berdasarkan ID."
@@ -146,9 +115,7 @@ def get_class_by_id(
     return school_class
 
 
-# =============================================================================
-#                      ENDPOINT: GET STUDENTS IN CLASS
-# =============================================================================
+# ENDPOINT: GET STUDENTS IN CLASS
 @router.get("/{class_id}/students", 
     summary="Lihat Daftar Siswa di Kelas",
     description="Menampilkan semua siswa yang terdaftar di kelas tertentu."
@@ -180,9 +147,7 @@ def get_students_in_class(
     return [{"id": s.id, "name": s.name, "email": s.email} for s in students]
 
 
-# =============================================================================
-#                           ENDPOINT: UPDATE CLASS
-# =============================================================================
+# ENDPOINT: UPDATE CLASS
 @router.put("/{class_id}", response_model=ClassRead,
     summary="Update Data Kelas",
     description="Mengubah data kelas. Hanya Admin."
@@ -221,9 +186,7 @@ def update_class(
     return school_class
 
 
-# =============================================================================
-#                           ENDPOINT: DELETE CLASS
-# =============================================================================
+# ENDPOINT: DELETE CLASS
 @router.delete("/{class_id}", status_code=status.HTTP_204_NO_CONTENT,
     summary="Hapus Kelas",
     description="Menghapus kelas dari database. Hanya Admin. Siswa di kelas akan jadi tanpa kelas."
@@ -255,9 +218,7 @@ def delete_class(
     return None
 
 
-# =============================================================================
-#                      ENDPOINT: ASSIGN STUDENT TO CLASS
-# =============================================================================
+# ENDPOINT: ASSIGN STUDENT TO CLASS
 @router.post("/assign-student",
     summary="Masukkan Siswa ke Kelas",
     description="Memasukkan siswa ke dalam kelas tertentu. Hanya Admin."

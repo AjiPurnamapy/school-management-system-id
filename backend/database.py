@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from sqlmodel import create_engine, Session
+from sqlmodel import create_engine, Session, SQLModel
 
 load_dotenv()
 
@@ -25,8 +25,19 @@ else:
     connect_args = {"check_same_thread": False} 
     engine = create_engine(sqlite_url, echo=True, connect_args=connect_args)
 
-#def create_db_table():
-    #SQLModel.metadata.create_all(engine)
+    # EVENT LISTENER: AKTIFKAN FOREIGN KEYS DI SQLITE
+    # Tanpa ini, 'ON DELETE CASCADE' tidak akan jalan, dan Orphan data akan menumpuk.
+    from sqlalchemy import event
+    from sqlalchemy.engine import Engine
+
+    @event.listens_for(Engine, "connect")
+    def set_sqlite_pragma(dbapi_connection, connection_record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
+def create_db_and_tables():
+    SQLModel.metadata.create_all(engine)
 
 def get_session():
     with Session(engine) as session:
