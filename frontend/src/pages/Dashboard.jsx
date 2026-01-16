@@ -275,7 +275,8 @@ const Dashboard = () => {
                             ☁️ Cloud Storage
                         </button>
                         
-                        {(user?.role === 'teacher' || user?.role === 'admin') && (
+                        {/* Menu Akademik: Tampilkan untuk Admin, Kepala Sekolah, dan Guru */}
+                        {(user?.role === 'teacher' || user?.role === 'admin' || user?.role === 'principal') && (
                             <>
                             <button 
                                 onClick={() => setActiveTab('classes')}
