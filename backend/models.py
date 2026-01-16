@@ -6,7 +6,15 @@ from sqlalchemy import Column, Integer, ForeignKey
 
 
 class UserRole(str, Enum):
+    """
+    Hierarki Role:
+    - admin     : Super admin (IT/System) - Full akses sistem
+    - principal : Kepala Sekolah - Manajemen akademik (kelas, wali kelas, jadwal)
+    - teacher   : Guru - Mengajar, upload materi, input nilai
+    - student   : Siswa - Lihat materi, kumpul tugas
+    """
     admin = "admin"
+    principal = "principal"  # NEW: Kepala Sekolah
     teacher = "teacher"
     student = "student"
 
@@ -76,6 +84,12 @@ class Subject(SQLModel, table=True):
     name: str = Field(max_length=100, index=True) # e.g. "Matematika"
     code: str = Field(max_length=20, unique=True, index=True) # e.g. "MTK-10"
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    # Guru Pengampu Utama (Koordinator Mapel)
+    teacher_id: Optional[int] = Field(default=None, foreign_key="user.id")
+    
+    # Relasi
+    teacher: Optional["User"] = Relationship()
     schedules: List["Schedule"] = Relationship(back_populates="subject")
 
 class DayEnum(str, Enum):
@@ -87,9 +101,24 @@ class DayEnum(str, Enum):
     SABTU = "Sabtu"
 
 class Schedule(SQLModel, table=True):
+    """
+    Jadwal Pelajaran per Kelas.
+    
+    Index Strategy:
+    - idx_schedule_class_day: Composite index untuk query jadwal per kelas per hari
+      Query pattern: SELECT * FROM schedule WHERE class_id=? AND day=?
+    - idx_schedule_teacher_day: Untuk cek konflik jadwal guru
+      Query pattern: SELECT * FROM schedule WHERE teacher_id=? AND day=?
+    """
+    # Composite Indexes untuk optimasi query
+    __table_args__ = (
+        # Index untuk query jadwal per kelas per hari (paling sering dipakai)
+        {"comment": "Schedule table with composite indexes for performance"},
+    )
+    
     id: Optional[int] = Field(default=None, primary_key=True)
     
-    # Foreign Keys
+    # Foreign Keys (masing-masing sudah punya single-column index)
     class_id: int = Field(foreign_key="schoolclass.id", index=True)
     subject_id: int = Field(foreign_key="subject.id", index=True)
     teacher_id: int = Field(foreign_key="user.id", index=True)
@@ -98,10 +127,52 @@ class Schedule(SQLModel, table=True):
     school_class: Optional["SchoolClass"] = Relationship(back_populates="schedules")
     subject: Optional["Subject"] = Relationship(back_populates="schedules")
     teacher: Optional["User"] = Relationship(back_populates="teaching_schedules")
+    materials: List["Material"] = Relationship(back_populates="schedule")  # NEW: Materi pelajaran
 
     # Waktu
-    day: DayEnum
+    day: DayEnum = Field(index=True)  # Added index for day column
     start_time: str = Field(max_length=5) # Format "HH:MM" e.g "07:00"
     end_time: str = Field(max_length=5)   # Format "HH:MM" e.g "08:30"
     
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+
+# ============================================================================
+# MATERIAL MODEL (Materi Pelajaran / Course Content)
+# ============================================================================
+# Catatan Arsitektur:
+# - File TIDAK disimpan dalam database (BLOB), hanya path-nya saja.
+#   Ini untuk efisiensi storage dan performa query.
+# - Setiap Material terhubung ke satu Schedule (pertemuan).
+# - Index pada schedule_id dan uploaded_by untuk query cepat.
+# ============================================================================
+
+class Material(SQLModel, table=True):
+    """
+    Menyimpan metadata file materi pelajaran.
+    File fisik disimpan di folder: backend/static/materials/
+    """
+    id: Optional[int] = Field(default=None, primary_key=True)
+    
+    # ========== RELASI ==========
+    # Material terhubung ke satu Jadwal (Schedule)
+    # Index untuk query: "Tampilkan semua materi untuk jadwal X"
+    schedule_id: int = Field(foreign_key="schedule.id", index=True)
+    
+    # Siapa yang upload? (Untuk audit trail & permission check)
+    uploaded_by: int = Field(foreign_key="user.id", index=True)
+    
+    # ========== METADATA FILE ==========
+    title: str = Field(max_length=200, index=True)       # Judul materi (searchable)
+    description: Optional[str] = Field(default=None, max_length=1000)  # Deskripsi opsional
+    file_url: str = Field(max_length=500)                # Path relatif: /static/materials/xxx.pdf
+    file_type: str = Field(max_length=50)                # Extension: pdf, mp4, pptx, dll
+    file_size: int = Field(default=0)                    # Ukuran dalam bytes (untuk UI display)
+    
+    # ========== AUDIT TRAIL ==========
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    # ========== RELATIONSHIPS (Eager Loading Ready) ==========
+    schedule: Optional["Schedule"] = Relationship(back_populates="materials")
+    uploader: Optional["User"] = Relationship()  # Simple link, no back_populates needed

@@ -3,6 +3,8 @@ import axios from 'axios';
 
 const Subjects = () => {
     const [subjects, setSubjects] = useState([]);
+    const [teachers, setTeachers] = useState([]); // Add Teachers State
+    const [currentUser, setCurrentUser] = useState(null); // Add State
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
@@ -10,6 +12,7 @@ const Subjects = () => {
     const [isCreating, setIsCreating] = useState(false);
     const [newName, setNewName] = useState('');
     const [newCode, setNewCode] = useState('');
+    const [selectedTeacher, setSelectedTeacher] = useState(''); // Add Teacher Selection State
 
     useEffect(() => {
         fetchSubjects();
@@ -19,10 +22,14 @@ const Subjects = () => {
         setLoading(true);
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.get('/subjects/', { 
-                headers: { Authorization: `Bearer ${token}` } 
-            });
-            setSubjects(res.data);
+            const [resSubjects, resProfile, resTeachers] = await Promise.all([
+                axios.get('/subjects/', { headers: { Authorization: `Bearer ${token}` } }),
+                axios.get('/myprofile', { headers: { Authorization: `Bearer ${token}` } }),
+                axios.get('/users/?role=teacher', { headers: { Authorization: `Bearer ${token}` } })
+            ]);
+            setSubjects(resSubjects.data);
+            setCurrentUser(resProfile.data);
+            setTeachers(resTeachers.data);
             setError(null);
         } catch (err) {
             console.error(err);
@@ -38,7 +45,8 @@ const Subjects = () => {
         try {
             await axios.post('/subjects/', {
                 name: newName,
-                code: newCode
+                code: newCode,
+                teacher_id: selectedTeacher ? parseInt(selectedTeacher) : null
             }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
@@ -46,6 +54,7 @@ const Subjects = () => {
             setIsCreating(false);
             setNewName('');
             setNewCode('');
+            setSelectedTeacher('');
             fetchSubjects();
         } catch (err) {
             console.error(err);
@@ -75,21 +84,23 @@ const Subjects = () => {
                     <h2 className="mb-1" style={{ fontSize: '1.75rem', fontWeight: '800', color: '#1e293b', letterSpacing: '-0.025em' }}>Mata Pelajaran 📚</h2>
                     <p className="text-muted m-0" style={{fontSize: '1rem'}}>Kelola daftar mata pelajaran sekolah.</p>
                 </div>
-                <button 
-                    onClick={() => setIsCreating(true)} 
-                    className="btn-primary"
-                    style={{
-                        width: 'auto', 
-                        padding: '12px 24px', 
-                        borderRadius: '12px',
-                        background: '#4f46e5',
-                        display: 'flex', alignItems: 'center', gap: '8px',
-                        boxShadow: '0 4px 12px rgba(79, 70, 229, 0.2)',
-                        transition: 'all 0.3s ease'
-                    }}
-                >
-                    ➕ Tambah Mapel
-                </button>
+                {currentUser?.role === 'admin' && (
+                    <button 
+                        onClick={() => setIsCreating(true)} 
+                        className="btn-primary"
+                        style={{
+                            width: 'auto', 
+                            padding: '12px 24px', 
+                            borderRadius: '12px',
+                            background: '#4f46e5',
+                            display: 'flex', alignItems: 'center', gap: '8px',
+                            boxShadow: '0 4px 12px rgba(79, 70, 229, 0.2)',
+                            transition: 'all 0.3s ease'
+                        }}
+                    >
+                        ➕ Tambah Mapel
+                    </button>
+                )}
             </div>
 
             {/* SUBJECT TABLE */}
@@ -99,7 +110,10 @@ const Subjects = () => {
                         <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
                             <th style={{ padding: '20px', fontSize: '0.75rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Kode</th>
                             <th style={{ padding: '20px', fontSize: '0.75rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Nama Mata Pelajaran</th>
-                            <th style={{ padding: '20px', fontSize: '0.75rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em', textAlign: 'right' }}>Aksi</th>
+                            <th style={{ padding: '20px', fontSize: '0.75rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Guru Pengampu</th>
+                            {currentUser?.role === 'admin' && (
+                                <th style={{ padding: '20px', fontSize: '0.75rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em', textAlign: 'right' }}>Aksi</th>
+                            )}
                         </tr>
                     </thead>
                     <tbody>
@@ -138,24 +152,40 @@ const Subjects = () => {
                                     <td style={{ padding: '20px', fontWeight: '600', color: '#334155' }}>
                                         {sub.name}
                                     </td>
-                                    <td style={{ padding: '20px', textAlign: 'right' }}>
-                                        <div className="flex justify-end gap-2">
-                                            <button 
-                                                onClick={() => handleDelete(sub.id)}
-                                                style={{ 
-                                                    background: 'transparent', color: '#ef4444', 
-                                                    border: '1px solid #e2e8f0', padding: '8px 12px', borderRadius: '8px', 
-                                                    cursor: 'pointer', fontSize: '0.9rem',
-                                                    transition: 'all 0.2s'
-                                                }}
-                                                onMouseOver={(e) => {e.target.style.background = '#fee2e2'; e.target.style.borderColor = '#fca5a5'}}
-                                                onMouseOut={(e) => {e.target.style.background = 'transparent'; e.target.style.borderColor = '#e2e8f0'}}
-                                                title="Hapus Mapel"
-                                            >
-                                                🗑️
-                                            </button>
-                                        </div>
+                                    <td style={{ padding: '20px' }}>
+                                        {sub.teacher_id ? (
+                                            <div className="flex align-center gap-2">
+                                                <div style={{width:'24px', height:'24px', borderRadius:'50%', background:'#e2e8f0', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'0.7rem', fontWeight:'bold', color:'#64748b'}}>
+                                                    G
+                                                </div>
+                                                <span className="text-sm text-slate-600">
+                                                    {teachers.find(t => t.id === sub.teacher_id)?.name || `Guru #${sub.teacher_id}`}
+                                                </span>
+                                            </div>
+                                        ) : (
+                                            <span className="text-sm text-slate-400 italic">-- Belum ada --</span>
+                                        )}
                                     </td>
+                                    {currentUser?.role === 'admin' && (
+                                        <td style={{ padding: '20px', textAlign: 'right' }}>
+                                            <div className="flex justify-end gap-2">
+                                                <button 
+                                                    onClick={() => handleDelete(sub.id)}
+                                                    style={{ 
+                                                        background: 'transparent', color: '#ef4444', 
+                                                        border: '1px solid #e2e8f0', padding: '8px 12px', borderRadius: '8px', 
+                                                        cursor: 'pointer', fontSize: '0.9rem',
+                                                        transition: 'all 0.2s'
+                                                    }}
+                                                    onMouseOver={(e) => {e.target.style.background = '#fee2e2'; e.target.style.borderColor = '#fca5a5'}}
+                                                    onMouseOut={(e) => {e.target.style.background = 'transparent'; e.target.style.borderColor = '#e2e8f0'}}
+                                                    title="Hapus Mapel"
+                                                >
+                                                    🗑️
+                                                </button>
+                                            </div>
+                                        </td>
+                                    )}
                                 </tr>
                             ))
                         )}
@@ -212,6 +242,19 @@ const Subjects = () => {
                                         />
                                     </div>
                                     <p className="text-xs text-slate-400 mt-2 ml-1">Kode unik untuk identifikasi mata pelajaran.</p>
+                                </div>
+                                <div className="form-group mb-0">
+                                    <label className="form-label text-sm font-bold text-slate-700">Guru Pengampu (Koordinator)</label>
+                                    <select 
+                                        className="form-control"
+                                        value={selectedTeacher} onChange={e => setSelectedTeacher(e.target.value)}
+                                        style={{ padding: '12px', borderRadius: '12px', background: '#f8fafc' }}
+                                    >
+                                        <option value="">-- Pilih Guru --</option>
+                                        {Array.isArray(teachers) && teachers.map(t => (
+                                            <option key={t.id} value={t.id}>{t.name}</option>
+                                        ))}
+                                    </select>
                                 </div>
                             </div>
                             

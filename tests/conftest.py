@@ -1,3 +1,7 @@
+import os
+# Set test environment flag BEFORE importing app to disable rate limiter
+os.environ["TESTING"] = "true"
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, SQLModel, create_engine, select

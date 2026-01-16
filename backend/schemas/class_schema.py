@@ -1,5 +1,5 @@
 from typing import Optional, List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class ClassCreate(BaseModel):
@@ -17,14 +17,14 @@ class ClassUpdate(BaseModel):
 
 
 class ClassRead(BaseModel):
+    """Schema untuk response membaca data kelas."""
+    model_config = ConfigDict(from_attributes=True)  # Pydantic V2 style
+    
     id: int
     name: str
     grade_level: int
     academic_year: str
     wali_kelas_id: Optional[int] = None
-    
-    class Config:
-        from_attributes = True  # Agar bisa convert dari SQLModel ke Pydantic
 
 
 class AssignStudentRequest(BaseModel):

@@ -22,7 +22,20 @@ const Schedules = () => {
     const [formTeacher, setFormTeacher] = useState('');
 
     // State tambahan untuk Edit
+    // State tambahan untuk Edit
     const [editId, setEditId] = useState(null);
+    const [currentUser, setCurrentUser] = useState(null); // INFO USER LOGIN
+
+    // ========== STATE UNTUK MATERI PELAJARAN (LMS) ==========
+    const [showMaterialModal, setShowMaterialModal] = useState(false);
+    const [selectedScheduleForMaterial, setSelectedScheduleForMaterial] = useState(null);
+    const [materials, setMaterials] = useState([]);
+    const [loadingMaterials, setLoadingMaterials] = useState(false);
+    // Form upload materi
+    const [materialTitle, setMaterialTitle] = useState('');
+    const [materialDesc, setMaterialDesc] = useState('');
+    const [materialFile, setMaterialFile] = useState(null);
+    const [uploadingMaterial, setUploadingMaterial] = useState(false);
 
     const days = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
 
@@ -41,14 +54,16 @@ const Schedules = () => {
     const fetchInitialData = async () => {
         try {
             const token = localStorage.getItem('token');
-            const [resClasses, resSubjects, resTeachers] = await Promise.all([
+            const [resClasses, resSubjects, resTeachers, resProfile] = await Promise.all([
                 axios.get('/classes/', { headers: { Authorization: `Bearer ${token}` } }),
                 axios.get('/subjects/', { headers: { Authorization: `Bearer ${token}` } }),
-                axios.get('/users/?role=teacher', { headers: { Authorization: `Bearer ${token}` } })
+                axios.get('/users/?role=teacher', { headers: { Authorization: `Bearer ${token}` } }),
+                axios.get('/myprofile', { headers: { Authorization: `Bearer ${token}` } }) // Cek Role
             ]);
             setClasses(resClasses.data);
             setSubjects(resSubjects.data);
             setTeachers(resTeachers.data);
+            setCurrentUser(resProfile.data);
         } catch (err) {
             console.error(err);
             setError("Gagal memuat data awal.");
@@ -147,6 +162,122 @@ const Schedules = () => {
     // Helper to group schedules by day
     const getSchedulesByDay = (day) => schedules.filter(s => s.day === day).sort((a, b) => a.start_time.localeCompare(b.start_time));
 
+    // ========== FUNGSI MATERI PELAJARAN ==========
+    
+    /**
+     * Buka modal materi untuk jadwal tertentu.
+     * Akan fetch list materi yang sudah diupload.
+     */
+    const openMaterialModal = async (schedule) => {
+        setSelectedScheduleForMaterial(schedule);
+        setShowMaterialModal(true);
+        setLoadingMaterials(true);
+        
+        try {
+            const token = localStorage.getItem('token');
+            const res = await axios.get(`/materials/?schedule_id=${schedule.id}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setMaterials(res.data);
+        } catch (err) {
+            console.error(err);
+            alert('Gagal memuat daftar materi.');
+        } finally {
+            setLoadingMaterials(false);
+        }
+    };
+
+    /**
+     * Tutup modal dan reset semua state terkait materi.
+     */
+    const closeMaterialModal = () => {
+        setShowMaterialModal(false);
+        setSelectedScheduleForMaterial(null);
+        setMaterials([]);
+        setMaterialTitle('');
+        setMaterialDesc('');
+        setMaterialFile(null);
+    };
+
+    /**
+     * Upload file materi ke backend.
+     * Menggunakan FormData karena ada file upload.
+     */
+    const handleUploadMaterial = async (e) => {
+        e.preventDefault();
+        if (!materialFile) {
+            alert('Pilih file terlebih dahulu!');
+            return;
+        }
+        
+        setUploadingMaterial(true);
+        const token = localStorage.getItem('token');
+        
+        // FormData untuk multipart upload
+        const formData = new FormData();
+        formData.append('title', materialTitle);
+        formData.append('description', materialDesc);
+        formData.append('file', materialFile);
+        
+        try {
+            await axios.post(`/materials/upload/${selectedScheduleForMaterial.id}`, formData, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'multipart/form-data'
+                }
+            });
+            
+            alert('Materi berhasil diupload!');
+            
+            // Reset form dan refresh list
+            setMaterialTitle('');
+            setMaterialDesc('');
+            setMaterialFile(null);
+            
+            // Refresh materials list
+            const res = await axios.get(`/materials/?schedule_id=${selectedScheduleForMaterial.id}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setMaterials(res.data);
+            
+        } catch (err) {
+            console.error(err);
+            const msg = err.response?.data?.detail || 'Gagal upload materi.';
+            alert(msg);
+        } finally {
+            setUploadingMaterial(false);
+        }
+    };
+
+    /**
+     * Hapus materi dengan konfirmasi.
+     */
+    const handleDeleteMaterial = async (materialId) => {
+        if (!window.confirm('Hapus materi ini?')) return;
+        
+        const token = localStorage.getItem('token');
+        try {
+            await axios.delete(`/materials/${materialId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            
+            // Refresh list
+            setMaterials(materials.filter(m => m.id !== materialId));
+        } catch (err) {
+            console.error(err);
+            alert('Gagal menghapus materi.');
+        }
+    };
+
+    /**
+     * Format ukuran file dari bytes ke KB/MB.
+     */
+    const formatFileSize = (bytes) => {
+        if (bytes < 1024) return `${bytes} B`;
+        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+        return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    };
+
     return (
         <div className="glass-card p-6 animate-fade-in" style={{ minHeight: '80vh', transition: 'height 0.3s ease' }}>
             {/* Header Section */}
@@ -158,26 +289,29 @@ const Schedules = () => {
                      <p className="text-muted m-0">Atur jadwal mingguan per kelas.</p>
                 </div>
                 {/* Action Button: Always Visible for better UX */}
-                 <button 
-                    onClick={() => {
-                        if (!selectedClass) {
-                            alert("⚠️ Mohon pilih kelas terlebih dahulu sebelum menambah jadwal!");
-                            return;
-                        }
-                        closeForm(); 
-                        setShowForm(true);
-                    }}
-                    className={`btn-primary ${!selectedClass ? 'opacity-50' : ''}`}
-                    title={!selectedClass ? "Pilih kelas dulu untuk aktifkan" : "Tambah Jadwal Baru"}
-                    style={{ 
-                        width: 'auto', 
-                        padding: '10px 24px', 
-                        background: '#4f46e5',
-                        cursor: selectedClass ? 'pointer' : 'not-allowed'
-                    }}
-                 >
-                    ➕ Tambah Jadwal
-                 </button>
+                {/* Action Button: Only for Admin */}
+                 {currentUser?.role === 'admin' && (
+                     <button 
+                        onClick={() => {
+                            if (!selectedClass) {
+                                alert("⚠️ Mohon pilih kelas terlebih dahulu sebelum menambah jadwal!");
+                                return;
+                            }
+                            closeForm(); 
+                            setShowForm(true);
+                        }}
+                        className={`btn-primary ${!selectedClass ? 'opacity-50' : ''}`}
+                        title={!selectedClass ? "Pilih kelas dulu untuk aktifkan" : "Tambah Jadwal Baru"}
+                        style={{ 
+                            width: 'auto', 
+                            padding: '10px 24px', 
+                            background: '#4f46e5',
+                            cursor: selectedClass ? 'pointer' : 'not-allowed'
+                        }}
+                     >
+                        ➕ Tambah Jadwal
+                     </button>
+                 )}
             </div>
 
             {/* CLASS SELECTOR */}
@@ -251,6 +385,8 @@ const Schedules = () => {
                                                                     onClick={() => handleEdit(sch)}
                                                                     className="text-slate-300 hover:text-blue-500 transition-colors"
                                                                     title="Edit"
+                                                                    /* Disable edit for non-admin on button click, better hidden though */
+                                                                    style={{ display: currentUser?.role === 'admin' ? 'block' : 'none' }}
                                                                 >
                                                                     ✏️
                                                                 </button>
@@ -258,6 +394,7 @@ const Schedules = () => {
                                                                     onClick={() => handleDelete(sch.id)}
                                                                     className="text-slate-300 hover:text-red-500 transition-colors"
                                                                     title="Hapus"
+                                                                    style={{ display: currentUser?.role === 'admin' ? 'block' : 'none' }}
                                                                 >
                                                                     &times;
                                                                 </button>
@@ -273,6 +410,14 @@ const Schedules = () => {
                                                         <p className="text-xs text-slate-500 m-0 flex items-center gap-1">
                                                             <span>👨‍🏫</span> {sch.teacher_name}
                                                         </p>
+                                                        
+                                                        {/* TOMBOL MATERI (NEW) */}
+                                                        <button 
+                                                            onClick={() => openMaterialModal(sch)}
+                                                            className="mt-2 w-full text-xs py-1.5 px-3 rounded-lg border border-indigo-200 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 transition-colors flex items-center justify-center gap-1"
+                                                        >
+                                                            📎 Materi
+                                                        </button>
                                                     </div>
                                                 ))}
                                             </div>
@@ -362,6 +507,146 @@ const Schedules = () => {
                                 <button type="submit" className="btn-primary flex-1">{editId ? 'Simpan Perubahan' : 'Simpan Jadwal'}</button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* ========== MATERIAL MODAL (LMS) ========== */}
+            {showMaterialModal && selectedScheduleForMaterial && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                    background: 'rgba(15, 23, 42, 0.7)', zIndex: 1000,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    backdropFilter: 'blur(5px)'
+                }}>
+                    <div className="glass-card animate-slide-down" style={{
+                        width: '700px', maxWidth: '95vw', background: 'white', padding: '32px', 
+                        borderRadius: '24px', border: '1px solid #e2e8f0',
+                        maxHeight: '90vh', overflowY: 'auto',
+                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+                    }}>
+                        {/* Header */}
+                        <div className="flex-between align-center mb-6">
+                            <div>
+                                <h3 className="m-0 text-xl font-bold text-slate-800">📎 Materi Pelajaran</h3>
+                                <p className="text-sm text-slate-500 m-0 mt-1">
+                                    {selectedScheduleForMaterial.subject_name} — {selectedScheduleForMaterial.day}, {selectedScheduleForMaterial.start_time}
+                                </p>
+                            </div>
+                            <button onClick={closeMaterialModal} 
+                                className="hover:bg-slate-100 p-2 rounded-full transition-colors"
+                                style={{background:'none', border:'none', fontSize:'1.5rem', cursor:'pointer', color:'#94a3b8', lineHeight:1}}>&times;</button>
+                        </div>
+                        
+                        {/* DAFTAR MATERI YANG SUDAH DIUPLOAD */}
+                        <div className="mb-6">
+                            <h4 className="text-sm font-bold text-slate-600 mb-3 uppercase tracking-wide">📂 File Tersedia</h4>
+                            
+                            {loadingMaterials ? (
+                                <div className="text-center py-8 text-slate-400">
+                                    <div className="spinner mb-2"></div>
+                                    <p className="m-0 text-sm">Memuat materi...</p>
+                                </div>
+                            ) : materials.length === 0 ? (
+                                <div className="text-center py-8 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                                    <p className="text-slate-400 m-0">Belum ada materi yang diupload.</p>
+                                </div>
+                            ) : (
+                                <div className="flex flex-col gap-3">
+                                    {materials.map(mat => (
+                                        <div key={mat.id} className="p-4 rounded-xl border border-slate-200 bg-slate-50 hover:bg-white transition-colors flex items-center justify-between gap-4">
+                                            {/* File Info */}
+                                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                                                {/* Icon berdasarkan tipe file */}
+                                                <div className="w-10 h-10 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center text-lg flex-shrink-0">
+                                                    {mat.file_type === 'pdf' ? '📄' : 
+                                                     ['mp4', 'webm', 'mov'].includes(mat.file_type) ? '🎬' :
+                                                     ['jpg', 'jpeg', 'png', 'gif'].includes(mat.file_type) ? '🖼️' :
+                                                     ['ppt', 'pptx'].includes(mat.file_type) ? '📊' :
+                                                     ['doc', 'docx'].includes(mat.file_type) ? '📝' : '📁'}
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <h5 className="text-sm font-bold text-slate-800 m-0 truncate">{mat.title}</h5>                                                    <p className="text-xs text-slate-500 m-0">
+                                                        {mat.file_type.toUpperCase()} • {formatFileSize(mat.file_size)} • {mat.uploader_name}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            
+                                            {/* Actions */}
+                                            <div className="flex gap-2 flex-shrink-0">
+                                                <a 
+                                                    href={mat.file_url} 
+                                                    target="_blank" 
+                                                    rel="noopener noreferrer"
+                                                    className="px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 transition-colors"
+                                                >
+                                                    ⬇️ Download
+                                                </a>
+                                                <button 
+                                                    onClick={() => handleDeleteMaterial(mat.id)}
+                                                    className="px-3 py-1.5 rounded-lg border border-red-200 text-red-600 text-xs font-bold hover:bg-red-50 transition-colors"
+                                                >
+                                                    🗑️
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                        
+                        {/* FORM UPLOAD MATERI BARU */}
+                        <div className="pt-6 border-t border-slate-200">
+                            <h4 className="text-sm font-bold text-slate-600 mb-4 uppercase tracking-wide">⬆️ Upload Materi Baru</h4>
+                            
+                            <form onSubmit={handleUploadMaterial}>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                    <div className="form-group mb-0">
+                                        <label className="form-label text-sm font-bold text-slate-700">Judul Materi *</label>
+                                        <input 
+                                            type="text" 
+                                            className="form-control" 
+                                            placeholder="Contoh: Materi Bab 1 - Pengenalan"
+                                            value={materialTitle}
+                                            onChange={e => setMaterialTitle(e.target.value)}
+                                            required
+                                            maxLength={200}
+                                        />
+                                    </div>
+                                    <div className="form-group mb-0">
+                                        <label className="form-label text-sm font-bold text-slate-700">Pilih File *</label>
+                                        <input 
+                                            type="file" 
+                                            className="form-control"
+                                            onChange={e => setMaterialFile(e.target.files[0])}
+                                            accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.jpg,.jpeg,.png,.gif,.webp,.mp4,.webm,.mov,.mp3,.wav,.ogg"
+                                        />
+                                        <p className="text-xs text-slate-400 m-0 mt-1">Max 50MB. Format: PDF, DOC, PPT, Video, dll.</p>
+                                    </div>
+                                </div>
+                                
+                                <div className="form-group mb-4">
+                                    <label className="form-label text-sm font-bold text-slate-700">Deskripsi (Opsional)</label>
+                                    <textarea 
+                                        className="form-control"
+                                        placeholder="Penjelasan singkat tentang materi ini..."
+                                        value={materialDesc}
+                                        onChange={e => setMaterialDesc(e.target.value)}
+                                        rows={2}
+                                        maxLength={1000}
+                                    />
+                                </div>
+                                
+                                <button 
+                                    type="submit" 
+                                    className="btn-primary w-full"
+                                    disabled={uploadingMaterial || !materialTitle || !materialFile}
+                                    style={{ opacity: (uploadingMaterial || !materialTitle || !materialFile) ? 0.6 : 1 }}
+                                >
+                                    {uploadingMaterial ? '⏳ Mengupload...' : '⬆️ Upload Materi'}
+                                </button>
+                            </form>
+                        </div>
                     </div>
                 </div>
             )}

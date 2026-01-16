@@ -60,7 +60,14 @@ const Register = () => {
 
     return (
         <div className="auth-wrapper">
-            <div className="glass-card" style={{ maxWidth: '450px', width: '100%' }}>
+            {/* Remove glass-card to avoid GPU/Reflow glitch */}
+            <div style={{ 
+                maxWidth: '450px', width: '100%', 
+                background: 'rgba(255, 255, 255, 0.9)', 
+                backdropFilter: 'none', // DISABLE BLUR
+                padding: '40px', borderRadius: '24px',
+                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+            }}>
                 <h2 className="text-center mb-4">Create Account 🚀</h2>
                 
                 {error && <div className="text-danger mb-4">{error}</div>}
@@ -76,6 +83,8 @@ const Register = () => {
                             onChange={handleChange}
                             placeholder="e.g. Aji Purnomo"
                             required
+                            spellCheck="false"
+                            autoComplete="off"
                         />
                     </div>
                     <div className="form-group">
@@ -88,6 +97,7 @@ const Register = () => {
                             onChange={handleChange}
                             placeholder="name@example.com"
                             required
+                            spellCheck="false"
                             autoComplete="off"
                         />
                     </div>
@@ -102,6 +112,7 @@ const Register = () => {
                             placeholder="e.g. 25"
                             min="1"
                             required
+                            autoComplete="off"
                         />
                     </div>
                     <div className="form-group">

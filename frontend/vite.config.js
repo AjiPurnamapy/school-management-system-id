@@ -20,13 +20,13 @@ export default defineConfig({
       '/upload-photo': 'http://localhost:8000',
       '/forgot-password': 'http://localhost:8000',
       '/reset-password': 'http://localhost:8000',
-      '/reset-password': 'http://localhost:8000',
       '/files': 'http://localhost:8000',
       '/static': 'http://localhost:8000',
       '/classes': 'http://localhost:8000',
       '/users': 'http://localhost:8000',
       '/subjects': 'http://localhost:8000',
       '/schedules': 'http://localhost:8000',
+      '/materials': 'http://localhost:8000',  // NEW: Materi Pelajaran API
     }
   }
 })

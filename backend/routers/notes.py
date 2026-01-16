@@ -1,11 +1,16 @@
-from typing import List, Optional # Optional: artinya boleh kosong (None)
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlmodel import Session, select, col, desc, asc, func # SQL helpers
-from backend.schemas.notes import ReadNotes, CreateNotes, PaginatedResponse # Import PaginatedResponse
+"""Notes Router - CRUD untuk catatan pribadi pengguna."""
+
+from typing import List, Optional
+import math
+
+from fastapi import APIRouter, Depends, Query
+from sqlmodel import Session, select, col, desc, asc, func
+
+from backend.schemas.notes import ReadNotes, CreateNotes, PaginatedResponse
 from backend.database import get_session
 from backend.models import Note, User
 from backend.dependencies import get_current_user
-import math # Import math for ceil
+from backend.exceptions import NotFoundError, PermissionDeniedError
 
 router = APIRouter(
     prefix="/notes",    # semua URl diisi otomatis depannya/catatan
@@ -103,10 +108,10 @@ def update_notes(notes_id:int, new_notes:CreateNotes,
     notes_db = session.get(Note, notes_id)
 
     if not notes_db:
-        raise HTTPException(status_code=404, detail="notes not found")
+        raise NotFoundError("Catatan", notes_id)
     
     if notes_db.owner_id != current_user.id:
-        raise HTTPException(status_code=403, detail="youre not allowed")
+        raise PermissionDeniedError("mengedit catatan ini (bukan milik Anda)")
     
     notes_db.title = new_notes.title
     notes_db.content = new_notes.content
@@ -126,16 +131,16 @@ def delete_notes(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
-    # mencari catatan di database
+    # Cari catatan di database
     notes_db = session.get(Note, notes_id)
 
-    # catatan ada/tidak?
+    # Catatan ada/tidak?
     if not notes_db:
-        raise HTTPException(status_code=404, detail="notes not found")
+        raise NotFoundError("Catatan", notes_id)
     
-    # cek apakah pemilik catatan (id), sama dengan (id) user yg saat ini login?
+    # Cek apakah pemilik catatan sama dengan user yang login
     if notes_db.owner_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Not your own notes")
+        raise PermissionDeniedError("menghapus catatan ini (bukan milik Anda)")
 
     session.delete(notes_db)
     session.commit()

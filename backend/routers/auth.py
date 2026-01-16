@@ -189,9 +189,19 @@ async def upload_photo(
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):
-    # Kita harus memastikan file yang dikirim benar-benar gambar.
+    # Konstanta: Maksimal 2MB untuk foto profil
+    MAX_PHOTO_SIZE = 2 * 1024 * 1024  # 2MB
+    
+    # 1. VALIDASI: Pastikan file benar-benar gambar
     if file.content_type not in ["image/jpeg", "image/png"]:
         raise HTTPException(status_code=400, detail="Hanya boleh file JPG atau PNG")
+    
+    # 2. VALIDASI: Cek ukuran file (jika header tersedia)
+    if file.size and file.size > MAX_PHOTO_SIZE:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Ukuran foto terlalu besar. Maksimal {MAX_PHOTO_SIZE // (1024 * 1024)}MB."
+        )
     
     # Jika 1000 user upload file bernama "foto.jpg", file lama akan tertimpa.
     # Solusinya: Kita ganti namanya dengan kode acak (UUID).

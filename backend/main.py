@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from starlette.middleware.sessions import SessionMiddleware
-from backend.routers import notes, auth, files, classes, users, subjects, schedules
+from backend.routers import notes, auth, files, classes, users, subjects, schedules, materials
 from backend.database import engine, create_db_and_tables
 from backend.admin import setup_admin
 from slowapi import _rate_limit_exceeded_handler
@@ -26,9 +26,11 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent  # Mencari alamat folder tempat file ini berada
 STATIC_DIR = os.path.join(BASE_DIR, "static") # Menunjuk ke folder 'static'
 IMAGES_DIR = os.path.join(STATIC_DIR, "images") # Menunjuk ke folder 'static/images'
+MATERIALS_DIR = os.path.join(STATIC_DIR, "materials") # Menunjuk ke folder 'static/materials' (NEW)
 
 # Buat folder jika belum ada (agar tidak error saat pertama kali dijalankan)
 os.makedirs(IMAGES_DIR, exist_ok=True)
+os.makedirs(MATERIALS_DIR, exist_ok=True)  # NEW: Folder untuk materi pelajaran
 
 # konfigurasi Logging
 logging.basicConfig(
@@ -104,6 +106,7 @@ app.include_router(classes.router) # Router Kelas Sekolah
 app.include_router(users.router)   # Router Users
 app.include_router(subjects.router) # Router Mapel
 app.include_router(schedules.router) # Router Jadwal
+app.include_router(materials.router) # Router Materi Pelajaran (LMS)
 
 # pasang admin panel
 setup_admin(app, engine)

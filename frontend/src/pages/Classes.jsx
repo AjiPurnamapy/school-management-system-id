@@ -4,6 +4,7 @@ import axios from 'axios';
 const Classes = () => {
     const [classes, setClasses] = useState([]);
     const [teachers, setTeachers] = useState([]);
+    const [currentUser, setCurrentUser] = useState(null); // Add User State
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
@@ -27,12 +28,14 @@ const Classes = () => {
         setLoading(true);
         try {
             const token = localStorage.getItem('token');
-            const [resClasses, resTeachers] = await Promise.all([
+            const [resClasses, resTeachers, resProfile] = await Promise.all([
                 axios.get('/classes/', { headers: { Authorization: `Bearer ${token}` } }),
-                axios.get('/users/?role=teacher', { headers: { Authorization: `Bearer ${token}` } })
+                axios.get('/users/?role=teacher', { headers: { Authorization: `Bearer ${token}` } }),
+                axios.get('/myprofile', { headers: { Authorization: `Bearer ${token}` } })
             ]);
             setClasses(resClasses.data);
             setTeachers(resTeachers.data);
+            setCurrentUser(resProfile.data);
             setError(null);
         } catch (err) {
             console.error(err);
@@ -134,83 +137,103 @@ const Classes = () => {
                     <h2 className="mb-1" style={{ fontSize: '1.75rem', fontWeight: '800', color: '#1e293b', letterSpacing: '-0.025em' }}>Manajemen Kelas 🏫</h2>
                     <p className="text-muted m-0" style={{fontSize: '1rem'}}>Kelola data akademik dan wali kelas.</p>
                 </div>
-                <button 
-                    onClick={() => setIsCreating(!isCreating)} 
-                    className="btn-primary"
-                    style={{
-                        width: 'auto', 
-                        padding: '12px 24px', 
-                        borderRadius: '12px',
-                        background: isCreating ? '#ef4444' : '#4f46e5',
-                        display: 'flex', alignItems: 'center', gap: '8px',
-                        boxShadow: '0 4px 12px rgba(79, 70, 229, 0.2)',
-                        transition: 'all 0.3s ease'
-                    }}
-                >
-                    {isCreating ? 'Tutup Form' : '➕ Tambah Kelas'}
-                </button>
+                
+                {/* Tombol Tambah Kelas - HANYA untuk Admin dan Kepala Sekolah */}
+                {(currentUser?.role === 'admin' || currentUser?.role === 'principal') && (
+                    <button 
+                        onClick={() => setIsCreating(!isCreating)} 
+                        className="btn-primary"
+                        style={{
+                            width: 'auto', 
+                            padding: '12px 24px', 
+                            borderRadius: '12px',
+                            background: isCreating ? '#ef4444' : '#4f46e5',
+                            display: 'flex', alignItems: 'center', gap: '8px',
+                            boxShadow: '0 4px 12px rgba(79, 70, 229, 0.2)',
+                            transition: 'all 0.3s ease'
+                        }}
+                    >
+                        {isCreating ? 'Tutup Form' : '➕ Tambah Kelas'}
+                    </button>
+                )}
             </div>
 
             {/* CREATE CLASS FORM */}
             {isCreating && (
-                <form onSubmit={handleCreateClass} className="glass-card mb-5 animate-slide-down" style={{ background: '#fff', border: '1px solid #e2e8f0', padding: '30px', borderRadius: '20px', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.05)' }}>
-                    <div className="flex-between align-center mb-6">
+                <form onSubmit={handleCreateClass} className="glass-card mb-6 animate-slide-down" style={{ background: '#fff', border: '1px solid #e2e8f0', padding: '0', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.05)' }}>
+                    <div style={{ padding: '20px', background: '#f1f5f9', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                          <h3 className="m-0 text-lg font-bold" style={{ color: '#334155' }}>Input Kelas Baru</h3>
+                         <button type="button" onClick={() => setIsCreating(false)} style={{ border:'none', background:'transparent', color:'#94a3b8', cursor:'pointer' }}>&times;</button>
                     </div>
                     
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '25px', marginBottom: '30px' }}>
-                        <div className="form-group mb-0">
-                            <label className="form-label font-bold text-xs mb-2 block uppercase tracking-wider" style={{color:'#94a3b8'}}>Nama Kelas</label>
-                            <input 
-                                type="text" className="form-control" 
-                                placeholder="Contoh: X-RPL-1" required 
-                                value={newName} onChange={e => setNewName(e.target.value)}
-                                style={{ padding: '14px', fontSize: '1rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px' }}
-                            />
+                    <div style={{ padding: '24px' }}>
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                            <div className="form-group mb-0">
+                                <label className="form-label font-bold text-xs mb-2 block uppercase tracking-wider" style={{color:'#64748b'}}>Nama Kelas</label>
+                                <input 
+                                    type="text" className="form-control" 
+                                    placeholder="Contoh: X-RPL-1" required 
+                                    value={newName} onChange={e => setNewName(e.target.value)}
+                                    style={{ padding: '12px', fontSize: '0.95rem', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '8px', width: '100%' }}
+                                />
+                            </div>
+                            <div className="form-group mb-0">
+                                <label className="form-label font-bold text-xs mb-2 block uppercase tracking-wider" style={{color:'#64748b'}}>Tingkat</label>
+                                <select 
+                                    className="form-control" 
+                                    value={newGrade} onChange={e => setNewGrade(e.target.value)}
+                                    style={{ padding: '12px', fontSize: '0.95rem', cursor: 'pointer', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '8px', width: '100%' }}
+                                >
+                                    <option value="10">Kelas 10 (X)</option>
+                                    <option value="11">Kelas 11 (XI)</option>
+                                    <option value="12">Kelas 12 (XII)</option>
+                                </select>
+                            </div>
+                            <div className="form-group mb-0">
+                                <label className="form-label font-bold text-xs mb-2 block uppercase tracking-wider" style={{color:'#64748b'}}>Tahun Ajaran</label>
+                                <select 
+                                    className="form-control"
+                                    value={newYear} onChange={e => setNewYear(e.target.value)}
+                                    style={{ padding: '12px', fontSize: '0.95rem', cursor: 'pointer', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '8px', width: '100%' }}
+                                >
+                                    <option value="2024/2025">2024/2025</option>
+                                    <option value="2025/2026">2025/2026</option>
+                                    <option value="2026/2027">2026/2027</option>
+                                </select>
+                            </div>
+                            <div className="form-group mb-0">
+                                <label className="form-label font-bold text-xs mb-2 block uppercase tracking-wider" style={{color:'#64748b'}}>Wali Kelas</label>
+                                
+                                {/* LOGIC: Jika Admin -> Dropdown. Jika Guru -> Auto set to self (tampilkan read-only/hidden) */}
+                                {currentUser?.role === 'admin' ? (
+                                    <select 
+                                        className="form-control"
+                                        value={selectedTeacher} onChange={e => setSelectedTeacher(e.target.value)}
+                                        style={{ padding: '12px', fontSize: '0.95rem', cursor: 'pointer', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '8px', width: '100%' }}
+                                    >
+                                        <option value="">-- Pilih Guru --</option>
+                                        {Array.isArray(teachers) && teachers.map(t => (
+                                            <option key={t.id} value={t.id}>{t.name}</option>
+                                        ))}
+                                    </select>
+                                ) : (
+                                    <input 
+                                        type="text" 
+                                        className="form-control"
+                                        value={currentUser?.name || ''} 
+                                        disabled
+                                        style={{ padding: '12px', fontSize: '0.95rem', background: '#e2e8f0', color: '#64748b', border: '1px solid #cbd5e1', borderRadius: '8px', width: '100%' }}
+                                        title="Anda akan otomatis menjadi wali kelas ini"
+                                    />
+                                )}
+                            </div>
                         </div>
-                        <div className="form-group mb-0">
-                            <label className="form-label font-bold text-xs mb-2 block uppercase tracking-wider" style={{color:'#94a3b8'}}>Tingkat</label>
-                            <select 
-                                className="form-control" 
-                                value={newGrade} onChange={e => setNewGrade(e.target.value)}
-                                style={{ padding: '14px', fontSize: '1rem', cursor: 'pointer', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px' }}
-                            >
-                                <option value="10">Kelas 10 (X)</option>
-                                <option value="11">Kelas 11 (XI)</option>
-                                <option value="12">Kelas 12 (XII)</option>
-                            </select>
+                        
+                        <div className="flex justify-end pt-4 border-t border-slate-100">
+                             <button type="submit" className="btn-primary" style={{ width: 'auto', padding: '12px 30px', fontWeight: '600', borderRadius: '8px', boxShadow: 'none' }}>
+                                ✨ Simpan Kelas
+                            </button>
                         </div>
-                        <div className="form-group mb-0">
-                            <label className="form-label font-bold text-xs mb-2 block uppercase tracking-wider" style={{color:'#94a3b8'}}>Tahun Ajaran</label>
-                            <select 
-                                className="form-control"
-                                value={newYear} onChange={e => setNewYear(e.target.value)}
-                                style={{ padding: '14px', fontSize: '1rem', cursor: 'pointer', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px' }}
-                            >
-                                <option value="2024/2025">2024/2025</option>
-                                <option value="2025/2026">2025/2026</option>
-                                <option value="2026/2027">2026/2027</option>
-                            </select>
-                        </div>
-                        <div className="form-group mb-0">
-                            <label className="form-label font-bold text-xs mb-2 block uppercase tracking-wider" style={{color:'#94a3b8'}}>Wali Kelas</label>
-                            <select 
-                                className="form-control"
-                                value={selectedTeacher} onChange={e => setSelectedTeacher(e.target.value)}
-                                style={{ padding: '14px', fontSize: '1rem', cursor: 'pointer', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px' }}
-                            >
-                                <option value="">-- Pilih Guru --</option>
-                                {Array.isArray(teachers) && teachers.map(t => (
-                                    <option key={t.id} value={t.id}>{t.name}</option>
-                                ))}
-                            </select>
-                        </div>
-                    </div>
-                    
-                    <div className="flex justify-end">
-                         <button type="submit" className="btn-primary" style={{ width: 'auto', padding: '12px 30px', fontWeight: '600', borderRadius: '10px', boxShadow: 'none' }}>
-                            Simpan Data
-                        </button>
                     </div>
                 </form>
             )}
@@ -273,7 +296,9 @@ const Classes = () => {
                                                  <div style={{width:'32px', height:'32px', borderRadius:'50%', background:'#e2e8f0', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'0.8rem', fontWeight:'bold', color:'#64748b'}}>
                                                     G
                                                  </div>
-                                                 <span style={{color:'#475569', fontWeight:'500'}}>Guru #{cls.wali_kelas_id}</span>
+                                                 <span style={{color:'#475569', fontWeight:'500'}}>
+                                                    {teachers.find(t => t.id === cls.wali_kelas_id)?.name || `Guru #${cls.wali_kelas_id}`}
+                                                 </span>
                                             </div>
                                         ) : (
                                             <span style={{color:'#94a3b8', fontStyle:'italic', fontSize:'0.9rem'}}>-- Belum diset --</span>
