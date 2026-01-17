@@ -119,8 +119,8 @@ async def send_verification_email(email_to: EmailStr, username: str, token: str)
 
 async def send_reset_password_email(email_to: EmailStr, token: str):
     # DOMAIN biasanya backend, tapi untuk reset password kita butuh link ke FRONTEND (localhost:5173)
-    # Jadi kita hardcode defaultnya ke port frontend jika DOMAIN tidak diset
-    frontend_url = "http://localhost:5173"
+    # Gunakan FRONTEND_URL dari environment untuk fleksibilitas deployment
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
     reset_link = f"{frontend_url}/reset?token={token}"
 
     if not conf:

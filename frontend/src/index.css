@@ -1,21 +1,21 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 :root {
-  /* Modern Indigo-Purple Palette */
-  --primary: #4f46e5;
-  --primary-hover: #4338ca;
-  --secondary: #818cf8;
-  --accent: #c026d3; /* Fuchsia for accents */
+  /* Modern Green Palette */
+  --primary: #22c55e;
+  --primary-hover: #16a34a;
+  --secondary: #4ade80;
+  --accent: #10b981; /* Emerald for accents */
   
-  --bg-gradient: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
+  --bg-gradient: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
   --text-main: #1f2937;
   --text-muted: #6b7280;
   
   /* Glassmorphism Variables */
-  --glass-bg: rgba(255, 255, 255, 0.7);
-  --glass-border: rgba(255, 255, 255, 0.4);
-  --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1);
-  --card-radius: 24px;
+  --glass-bg: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(255, 255, 255, 0.6);
+  --glass-shadow: 0 4px 20px rgba(34, 197, 94, 0.08);
+  --card-radius: 16px;
 }
 
 body {
@@ -78,7 +78,7 @@ body {
   outline: none;
   background: #fff;
   border-color: var(--primary);
-  box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1);
+  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.1);
 }
 
 /* Buttons */
@@ -99,7 +99,7 @@ body {
 .btn-primary:hover {
   background: var(--primary-hover);
   transform: translateY(-2px);
-  box-shadow: 0 10px 20px rgba(79, 70, 229, 0.2);
+  box-shadow: 0 10px 20px rgba(34, 197, 94, 0.2);
 }
 
 .btn-primary:active {

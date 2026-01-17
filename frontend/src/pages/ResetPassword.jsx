@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useToast } from '../contexts/ToastContext';
 
 const ResetPassword = () => {
     const [newPassword, setNewPassword] = useState('');
-    const [message, setMessage] = useState('');
-    const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     
     // Ambil token dari URL (?token=...)
@@ -13,17 +12,16 @@ const ResetPassword = () => {
     const token = searchParams.get('token');
     
     const navigate = useNavigate();
+    const { toast } = useToast();
 
     useEffect(() => {
         if (!token) {
-            setError("Token tidak valid atau hilang. Silahkan request ulang.");
+            toast.error("Token tidak valid atau hilang. Silahkan request ulang.");
         }
-    }, [token]);
+    }, [token, toast]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setMessage('');
-        setError('');
         setLoading(true);
 
         try {
@@ -31,21 +29,21 @@ const ResetPassword = () => {
                 token: token,
                 new_password: newPassword 
             });
-            setMessage(res.data.message);
+            toast.success(res.data.message || "Password berhasil direset!");
             
-            // Redirect ke login setelah 3 detik
+            // Redirect ke login setelah 2 detik
             setTimeout(() => {
                 navigate('/');
-            }, 3000);
+            }, 2000);
         } catch (err) {
-            setError(err.response?.data?.detail || 'Gagal mereset password');
+            toast.error(err.response?.data?.detail || 'Gagal mereset password');
         } finally {
             setLoading(false);
         }
     };
 
     if (!token) {
-        return <div className="glass-card text-center text-danger">{error}</div>;
+        return <div className="glass-card text-center text-danger">Token Invalid</div>;
     }
 
     return (
@@ -53,9 +51,6 @@ const ResetPassword = () => {
             <div className="glass-card" style={{ maxWidth: '400px', width: '100%' }}>
                 <h2 className="text-center mb-4">Reset Password 🔑</h2>
                 
-                {message && <div className="alert alert-success">{message}</div>}
-                {error && <div className="alert alert-danger">{error}</div>}
-
                 <form onSubmit={handleSubmit}>
                     <div className="form-group">
                         <label className="form-label">Password Baru</label>

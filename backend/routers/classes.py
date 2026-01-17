@@ -13,7 +13,7 @@ PENTING: Hanya Admin dan Kepala Sekolah yang boleh mengelola kelas!
 
 import logging
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlmodel import Session, select
 
 from backend.database import get_session
@@ -95,17 +95,23 @@ def create_class(
 # ENDPOINT UNTUK MELIHAT SEMUA KELAS
 @router.get("/", response_model=List[ClassRead],
     summary="Lihat Semua Kelas",
-    description="Menampilkan daftar semua kelas. Bisa diakses oleh semua user yang login."
+    description="Menampilkan daftar semua kelas dengan pagination. Bisa diakses oleh semua user yang login."
 )
 def get_all_classes(
+    offset: int = Query(0, ge=0, description="Mulai dari data ke-"),
+    limit: int = Query(50, ge=1, le=100, description="Jumlah data per halaman (max 100)"),
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)  # <-- Semua user bisa lihat
+    current_user: User = Depends(get_current_user)
 ):
     """
-    Mengambil daftar semua kelas dari database.
+    Mengambil daftar semua kelas dari database dengan pagination.
     Endpoint ini tidak dibatasi admin karena Guru/Siswa juga perlu lihat daftar kelas.
+    
+    Default: 50 item per halaman, maksimal 100 untuk mencegah overload.
     """
-    classes = session.exec(select(SchoolClass)).all()
+    classes = session.exec(
+        select(SchoolClass).offset(offset).limit(limit)
+    ).all()
     return classes
 
 

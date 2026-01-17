@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Optional, List
 from enum import Enum
 from sqlmodel import SQLModel, Field, Relationship
-from sqlalchemy import Column, Integer, ForeignKey
+from sqlalchemy import Column, Integer, ForeignKey, Index
 
 
 class UserRole(str, Enum):
@@ -32,6 +32,13 @@ class User(SQLModel, table=True):
     
     # Relasi: Siswa bisa masuk ke 1 Kelas (Optional karena Guru tidak punya kelas)
     class_id: Optional[int] = Field(default=None, foreign_key="schoolclass.id", index=True)
+    
+    # Profile Data (wajib diisi setelah registrasi)
+    nis: Optional[str] = Field(default=None, max_length=20, index=True)  # NIS/NIP
+    address: Optional[str] = Field(default=None, max_length=500)
+    phone: Optional[str] = Field(default=None, max_length=20)
+    birth_date: Optional[str] = Field(default=None, max_length=10)  # Format: YYYY-MM-DD
+    is_profile_complete: bool = Field(default=False)  # Flag untuk cek profil sudah lengkap
 
     # RELASI CASCADE DELETE (Hapus User = Hapus Data)
     notes: List["Note"] = Relationship(back_populates="owner", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
@@ -113,6 +120,9 @@ class Schedule(SQLModel, table=True):
     # Composite Indexes untuk optimasi query
     __table_args__ = (
         # Index untuk query jadwal per kelas per hari (paling sering dipakai)
+        Index('idx_schedule_class_day', 'class_id', 'day'),
+        # Index untuk cek konflik jadwal guru
+        Index('idx_schedule_teacher_day', 'teacher_id', 'day'),
         {"comment": "Schedule table with composite indexes for performance"},
     )
     
@@ -176,3 +186,57 @@ class Material(SQLModel, table=True):
     # ========== RELATIONSHIPS (Eager Loading Ready) ==========
     schedule: Optional["Schedule"] = Relationship(back_populates="materials")
     uploader: Optional["User"] = Relationship()  # Simple link, no back_populates needed
+
+
+# ============================================================================
+# ASSIGNMENT SYSTEM (LMS)
+# ============================================================================
+
+class Assignment(SQLModel, table=True):
+    """
+    Tugas yang diberikan oleh Guru untuk satu Kelas pada Mata Pelajaran tertentu.
+    """
+    id: Optional[int] = Field(default=None, primary_key=True)
+    
+    # Content
+    title: str = Field(max_length=200, index=True)
+    description: str = Field(max_length=5000) # Bisa panjang (instruksi tugas)
+    due_date: datetime = Field(index=True)    # Batas waktu pengumpulan
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    # Lampiran Soal (Optional) - Guru bisa upload PDF soal
+    file_url: Optional[str] = Field(default=None, max_length=500)
+    
+    # Context (Tugas ini untuk siapa?)
+    subject_id: int = Field(foreign_key="subject.id", index=True) # Mapel apa?
+    class_id: int = Field(foreign_key="schoolclass.id", index=True) # Kelas mana?
+    teacher_id: int = Field(foreign_key="user.id", index=True)      # Siapa yang buat?
+    
+    # Relationships
+    subject: Optional["Subject"] = Relationship()
+    school_class: Optional["SchoolClass"] = Relationship()
+    teacher: Optional["User"] = Relationship()
+    submissions: List["Submission"] = Relationship(back_populates="assignment", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
+
+
+class Submission(SQLModel, table=True):
+    """
+    Jawaban tugas yang dikumpulkan oleh Siswa.
+    """
+    id: Optional[int] = Field(default=None, primary_key=True)
+    
+    # Context
+    assignment_id: int = Field(foreign_key="assignment.id", index=True)
+    student_id: int = Field(foreign_key="user.id", index=True)
+    
+    # Content
+    file_url: str = Field(max_length=500) # File jawaban siswa
+    submitted_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    # Grading (Diisi oleh Guru)
+    grade: Optional[int] = Field(default=None) # Nilai 0-100
+    feedback: Optional[str] = Field(default=None, max_length=1000) # Catatan guru
+    
+    # Relationships
+    assignment: Optional["Assignment"] = Relationship(back_populates="submissions")
+    student: Optional["User"] = Relationship()

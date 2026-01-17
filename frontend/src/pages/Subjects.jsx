@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useToast } from '../contexts/ToastContext';
+import { useConfirm } from '../contexts/ConfirmContext';
 
 const Subjects = () => {
     const [subjects, setSubjects] = useState([]);
@@ -13,6 +15,8 @@ const Subjects = () => {
     const [newName, setNewName] = useState('');
     const [newCode, setNewCode] = useState('');
     const [selectedTeacher, setSelectedTeacher] = useState(''); // Add Teacher Selection State
+    const { toast } = useToast();
+    const { confirm } = useConfirm();
 
     useEffect(() => {
         fetchSubjects();
@@ -50,7 +54,7 @@ const Subjects = () => {
             }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            alert("Mata Pelajaran berhasil dibuat!");
+            toast.success("Mata Pelajaran berhasil dibuat!");
             setIsCreating(false);
             setNewName('');
             setNewCode('');
@@ -58,21 +62,29 @@ const Subjects = () => {
             fetchSubjects();
         } catch (err) {
             console.error(err);
-            alert(err.response?.data?.detail || "Gagal membuat mata pelajaran.");
+            toast.error(err.response?.data?.detail || "Gagal membuat mata pelajaran.");
         }
     };
 
     const handleDelete = async (id) => {
-        if (!window.confirm("Yakin hapus mata pelajaran ini?")) return;
+        const confirmed = await confirm({
+            title: 'Hapus Mata Pelajaran',
+            message: 'Yakin hapus mata pelajaran ini?',
+            confirmText: 'Ya, Hapus',
+            type: 'danger'
+        });
+        if (!confirmed) return;
+        
         const token = localStorage.getItem('token');
         try {
             await axios.delete(`/subjects/${id}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
+            toast.success("Mata pelajaran berhasil dihapus!");
             fetchSubjects();
         } catch (err) {
             console.error(err);
-            alert("Gagal menghapus mata pelajaran.");
+            toast.error("Gagal menghapus mata pelajaran.");
         }
     };
 
@@ -84,7 +96,8 @@ const Subjects = () => {
                     <h2 className="mb-1" style={{ fontSize: '1.75rem', fontWeight: '800', color: '#1e293b', letterSpacing: '-0.025em' }}>Mata Pelajaran 📚</h2>
                     <p className="text-muted m-0" style={{fontSize: '1rem'}}>Kelola daftar mata pelajaran sekolah.</p>
                 </div>
-                {currentUser?.role === 'admin' && (
+                {/* Action Button */}
+                {(currentUser?.role === 'admin' || currentUser?.role === 'principal') && (
                     <button 
                         onClick={() => setIsCreating(true)} 
                         className="btn-primary"
@@ -92,9 +105,9 @@ const Subjects = () => {
                             width: 'auto', 
                             padding: '12px 24px', 
                             borderRadius: '12px',
-                            background: '#4f46e5',
+                            background: '#22c55e',
                             display: 'flex', alignItems: 'center', gap: '8px',
-                            boxShadow: '0 4px 12px rgba(79, 70, 229, 0.2)',
+                            boxShadow: '0 4px 12px rgba(34, 197, 94, 0.2)',
                             transition: 'all 0.3s ease'
                         }}
                     >
@@ -111,7 +124,7 @@ const Subjects = () => {
                             <th style={{ padding: '20px', fontSize: '0.75rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Kode</th>
                             <th style={{ padding: '20px', fontSize: '0.75rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Nama Mata Pelajaran</th>
                             <th style={{ padding: '20px', fontSize: '0.75rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Guru Pengampu</th>
-                            {currentUser?.role === 'admin' && (
+                            {(currentUser?.role === 'admin' || currentUser?.role === 'principal') && (
                                 <th style={{ padding: '20px', fontSize: '0.75rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em', textAlign: 'right' }}>Aksi</th>
                             )}
                         </tr>
@@ -166,7 +179,7 @@ const Subjects = () => {
                                             <span className="text-sm text-slate-400 italic">-- Belum ada --</span>
                                         )}
                                     </td>
-                                    {currentUser?.role === 'admin' && (
+                                    {(currentUser?.role === 'admin' || currentUser?.role === 'principal') && (
                                         <td style={{ padding: '20px', textAlign: 'right' }}>
                                             <div className="flex justify-end gap-2">
                                                 <button 

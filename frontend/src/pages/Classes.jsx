@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useToast } from '../contexts/ToastContext';
+import { useConfirm } from '../contexts/ConfirmContext';
 
 const Classes = () => {
     const [classes, setClasses] = useState([]);
@@ -19,6 +21,9 @@ const Classes = () => {
     const [classStudents, setClassStudents] = useState([]);
     const [availableStudents, setAvailableStudents] = useState([]);
     const [studentToAdd, setStudentToAdd] = useState('');
+    const [studentsPerClass, setStudentsPerClass] = useState({}); // State untuk menyimpan siswa per kelas
+    const { toast } = useToast();
+    const { confirm } = useConfirm();
 
     useEffect(() => {
         fetchData();
@@ -37,6 +42,25 @@ const Classes = () => {
             setTeachers(resTeachers.data);
             setCurrentUser(resProfile.data);
             setError(null);
+            
+            // Auto-fetch siswa untuk setiap kelas
+            const classesData = resClasses.data;
+            const studentsData = {};
+            
+            // Fetch siswa secara paralel untuk semua kelas
+            await Promise.all(classesData.map(async (cls) => {
+                try {
+                    const res = await axios.get(`/classes/${cls.id}/students`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    studentsData[cls.id] = res.data;
+                } catch (err) {
+                    console.warn(`Gagal memuat siswa kelas ${cls.id}`);
+                    studentsData[cls.id] = [];
+                }
+            }));
+            
+            setStudentsPerClass(studentsData);
         } catch (err) {
             console.error(err);
             setError("Gagal memuat data.");
@@ -57,28 +81,36 @@ const Classes = () => {
             }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            alert("Kelas berhasil dibuat!");
+            toast.success("Kelas berhasil dibuat!");
             setIsCreating(false);
             setNewName('');
             setSelectedTeacher('');
             fetchData();
         } catch (err) {
             console.error(err);
-            alert("Gagal membuat kelas. Pastikan nama unik.");
+            toast.error("Gagal membuat kelas. Pastikan nama unik.");
         }
     };
 
     const handleDelete = async (id) => {
-        if (!window.confirm("Yakin hapus kelas ini?")) return;
+        const confirmed = await confirm({
+            title: 'Hapus Kelas',
+            message: 'Yakin hapus kelas ini? Semua data siswa di kelas ini akan terpengaruh.',
+            confirmText: 'Ya, Hapus',
+            type: 'danger'
+        });
+        if (!confirmed) return;
+        
         const token = localStorage.getItem('token');
         try {
             await axios.delete(`/classes/${id}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
+            toast.success("Kelas berhasil dihapus!");
             fetchData();
         } catch (err) {
             console.error(err);
-            alert("Gagal menghapus kelas.");
+            toast.error("Gagal menghapus kelas.");
         }
     };
 
@@ -94,7 +126,7 @@ const Classes = () => {
             setAvailableStudents(resAll.data);
         } catch (err) {
             console.error(err);
-            alert("Gagal memuat data siswa.");
+            toast.error("Gagal memuat data siswa.");
         }
     };
 
@@ -112,10 +144,10 @@ const Classes = () => {
             const res = await axios.get(`/classes/${manageClass.id}/students`, { headers: { Authorization: `Bearer ${token}` } });
             setClassStudents(res.data);
             setStudentToAdd('');
-            alert("Siswa berhasil ditambahkan!");
+            toast.success("Siswa berhasil ditambahkan!");
         } catch (err) {
             console.error(err);
-            alert("Gagal menambahkan siswa.");
+            toast.error("Gagal menambahkan siswa.");
         }
     };
 
@@ -134,8 +166,8 @@ const Classes = () => {
             {/* Header Section */}
             <div className="flex-between align-center mb-5">
                 <div>
-                    <h2 className="mb-1" style={{ fontSize: '1.75rem', fontWeight: '800', color: '#1e293b', letterSpacing: '-0.025em' }}>Manajemen Kelas 🏫</h2>
-                    <p className="text-muted m-0" style={{fontSize: '1rem'}}>Kelola data akademik dan wali kelas.</p>
+                    <h2 className="mb-1" style={{ fontSize: '1.75rem', fontWeight: '800', color: '#1e293b', letterSpacing: '-0.025em' }}>Daftar Kelas & Siswa 📚</h2>
+                    <p className="text-muted m-0" style={{fontSize: '1rem'}}>Lihat daftar anggota kelas dan informasi wali kelas.</p>
                 </div>
                 
                 {/* Tombol Tambah Kelas - HANYA untuk Admin dan Kepala Sekolah */}
@@ -147,9 +179,9 @@ const Classes = () => {
                             width: 'auto', 
                             padding: '12px 24px', 
                             borderRadius: '12px',
-                            background: isCreating ? '#ef4444' : '#4f46e5',
+                            background: isCreating ? '#ef4444' : '#22c55e',
                             display: 'flex', alignItems: 'center', gap: '8px',
-                            boxShadow: '0 4px 12px rgba(79, 70, 229, 0.2)',
+                            boxShadow: '0 4px 12px rgba(34, 197, 94, 0.2)',
                             transition: 'all 0.3s ease'
                         }}
                     >
@@ -238,108 +270,179 @@ const Classes = () => {
                 </form>
             )}
 
-            {/* CLASS TABLE */}
-            <div style={{ borderRadius: '16px', overflow: 'hidden', border: '1px solid #e2e8f0', background: 'white', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)', minHeight: '300px' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                    <thead>
-                        <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
-                            <th style={{ padding: '20px', fontSize: '0.75rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Nama Kelas</th>
-                            <th style={{ padding: '20px', fontSize: '0.75rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Tingkat</th>
-                            <th style={{ padding: '20px', fontSize: '0.75rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Tahun Ajaran</th>
-                            <th style={{ padding: '20px', fontSize: '0.75rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Wali Kelas</th>
-                            <th style={{ padding: '20px', fontSize: '0.75rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em', textAlign: 'right' }}>Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {loading ? (
-                             <tr>
-                                <td colSpan="5" className="text-center p-10">
-                                    <div className="flex-center flex-col py-10">
-                                        <div className="spinner mb-3"></div>
-                                        <p className="text-slate-500 font-bold">Memuat data kelas...</p>
-                                    </div>
-                                </td>
-                            </tr>
-                        ) : error ? (
-                             <tr>
-                                <td colSpan="5" className="text-center p-10 text-red-500 font-bold">
-                                    {error}
-                                </td>
-                            </tr>
-                        ) : classes.length === 0 ? (
-                            <tr>
-                                <td colSpan="5" className="text-center p-5">
-                                    <div style={{ fontSize: '3rem', marginBottom: '15px', color: '#cbd5e1' }}>📭</div>
-                                    <p style={{ color: '#94a3b8', fontWeight: '500' }}>Belum ada data kelas yang dibuat.</p>
-                                </td>
-                            </tr>
-                        ) : (
-                            classes.map((cls, index) => (
-                                <tr key={cls.id} className="hover:bg-slate-50 animate-fade-in" style={{ borderBottom: '1px solid #f1f5f9', transition: 'background 0.2s', animationDelay: `${index * 50}ms` }}>
-                                    <td style={{ padding: '20px', fontWeight: '600', color: '#334155' }}>
-                                        {cls.name}
-                                    </td>
-                                    <td style={{ padding: '20px' }}>
-                                        <span style={{
-                                            background: cls.grade_level === 10 ? '#dbeafe' : cls.grade_level === 11 ? '#fce7f3' : '#ffedd5',
-                                            color: cls.grade_level === 10 ? '#1e40af' : cls.grade_level === 11 ? '#9d174d' : '#9a3412',
-                                            padding: '6px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: '700',
-                                            display: 'inline-block', minWidth: '40px', textAlign: 'center'
-                                        }}>
-                                            {getRomanGrade(cls.grade_level)}
-                                        </span>
-                                    </td>
-                                    <td style={{ padding: '20px', color: '#64748b', fontSize: '0.9rem' }}>{cls.academic_year}</td>
-                                    <td style={{ padding: '20px' }}>
-                                        {cls.wali_kelas_id ? (
-                                            <div className="flex align-center gap-3">
-                                                 <div style={{width:'32px', height:'32px', borderRadius:'50%', background:'#e2e8f0', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'0.8rem', fontWeight:'bold', color:'#64748b'}}>
-                                                    G
-                                                 </div>
-                                                 <span style={{color:'#475569', fontWeight:'500'}}>
-                                                    {teachers.find(t => t.id === cls.wali_kelas_id)?.name || `Guru #${cls.wali_kelas_id}`}
-                                                 </span>
+            {/* CLASS CARDS - New Card-Based Layout */}
+            <div style={{ minHeight: '300px' }}>
+                {loading ? (
+                    <div className="flex-center flex-col py-20 text-slate-400">
+                        <div className="spinner mb-3"></div>
+                        <p className="text-slate-500 font-bold">Memuat data kelas...</p>
+                    </div>
+                ) : error ? (
+                    <div className="text-center p-10 text-red-500 font-bold">
+                        {error}
+                    </div>
+                ) : (() => {
+                    // FILTER: Siswa hanya lihat kelasnya sendiri
+                    const displayClasses = currentUser?.role === 'student' 
+                        ? classes.filter(c => c.id === currentUser?.class_id)
+                        : classes;
+                    
+                    // Jika siswa belum punya kelas
+                    if (currentUser?.role === 'student' && displayClasses.length === 0) {
+                        return (
+                            <div className="text-center p-10 bg-white rounded-xl border border-slate-200">
+                                <div style={{ fontSize: '3rem', marginBottom: '15px', color: '#fbbf24' }}>🎒</div>
+                                <p style={{ color: '#64748b', fontWeight: '600' }}>Kamu belum dimasukkan ke dalam kelas.</p>
+                                <p style={{ color: '#94a3b8', fontSize: '0.9rem' }}>Hubungi guru atau admin untuk didaftarkan ke kelas.</p>
+                            </div>
+                        );
+                    }
+                    
+                    if (displayClasses.length === 0) {
+                        return (
+                            <div className="text-center p-10 bg-white rounded-xl border border-dashed border-slate-300">
+                                <div style={{ fontSize: '3rem', marginBottom: '15px', color: '#cbd5e1' }}>📭</div>
+                                <p style={{ color: '#94a3b8', fontWeight: '500' }}>Belum ada data kelas yang dibuat.</p>
+                            </div>
+                        );
+                    }
+                    
+                    return (
+                        <div className="grid grid-cols-1 gap-6">
+                            {displayClasses.map((cls, index) => (
+                                <div 
+                                    key={cls.id} 
+                                    className="animate-fade-in"
+                                    style={{ 
+                                        background: 'white', 
+                                        borderRadius: '16px', 
+                                        border: '1px solid #e2e8f0',
+                                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)',
+                                        overflow: 'hidden',
+                                        animationDelay: `${index * 100}ms`
+                                    }}
+                                >
+                                    {/* CLASS HEADER */}
+                                    <div style={{ 
+                                        padding: '24px', 
+                                        borderBottom: '1px solid #e2e8f0',
+                                        background: '#f8fafc',
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'flex-start'
+                                    }}>
+                                        {/* Left: Class Info */}
+                                        <div>
+                                            <h3 style={{ 
+                                                fontSize: '1.5rem', 
+                                                fontWeight: '800', 
+                                                color: '#1e293b',
+                                                margin: 0,
+                                                marginBottom: '12px'
+                                            }}>
+                                                {cls.name}
+                                            </h3>
+                                            
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                <p style={{ margin: 0, fontSize: '0.95rem', color: '#475569' }}>
+                                                    <strong>Wali Kelas :</strong>{' '}
+                                                    {cls.wali_kelas_id 
+                                                        ? teachers.find(t => t.id === cls.wali_kelas_id)?.name || `Guru #${cls.wali_kelas_id}`
+                                                        : <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>Belum diset</span>
+                                                    }
+                                                </p>
+                                                <p style={{ margin: 0, fontSize: '0.95rem', color: '#475569' }}>
+                                                    <strong>Tahun Ajaran :</strong> {cls.academic_year}
+                                                </p>
                                             </div>
-                                        ) : (
-                                            <span style={{color:'#94a3b8', fontStyle:'italic', fontSize:'0.9rem'}}>-- Belum diset --</span>
-                                        )}
-                                    </td>
-                                    <td style={{ padding: '20px', textAlign: 'right' }}>
-                                        <div className="flex justify-end gap-2">
-                                            <button
-                                                onClick={() => openManageModal(cls)}
-                                                style={{
-                                                    background: 'transparent', color: '#0ea5e9',
-                                                    border: '1px solid #0ea5e9', padding: '8px 16px', borderRadius: '8px',
-                                                    cursor: 'pointer', fontWeight: '600', fontSize: '0.8rem',
-                                                    transition: 'all 0.2s'
-                                                }}
-                                                onMouseOver={(e) => e.target.style.background = '#e0f2fe'}
-                                                onMouseOut={(e) => e.target.style.background = 'transparent'}
-                                            >
-                                                👥 Anggota
-                                            </button>
-                                            <button 
-                                                onClick={() => handleDelete(cls.id)}
-                                                style={{ 
-                                                    background: 'transparent', color: '#ef4444', 
-                                                    border: '1px solid #e2e8f0', padding: '8px 12px', borderRadius: '8px', 
-                                                    cursor: 'pointer', fontSize: '0.9rem',
-                                                    transition: 'all 0.2s'
-                                                }}
-                                                onMouseOver={(e) => {e.target.style.background = '#fee2e2'; e.target.style.borderColor = '#fca5a5'}}
-                                                onMouseOut={(e) => {e.target.style.background = 'transparent'; e.target.style.borderColor = '#e2e8f0'}}
-                                                title="Hapus Kelas"
-                                            >
-                                                🗑️
-                                            </button>
                                         </div>
-                                    </td>
-                                </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
+                                        
+                                        {/* Right: Action Buttons - Only for Admin/Teacher */}
+                                        {currentUser?.role !== 'student' && (
+                                            <div style={{ display: 'flex', gap: '8px' }}>
+                                                <button
+                                                    onClick={() => openManageModal(cls)}
+                                                    style={{
+                                                        background: '#22c55e', 
+                                                        color: 'white',
+                                                        border: 'none', 
+                                                        padding: '10px 20px', 
+                                                        borderRadius: '8px',
+                                                        cursor: 'pointer', 
+                                                        fontWeight: '600', 
+                                                        fontSize: '0.85rem',
+                                                        transition: 'all 0.2s',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '6px'
+                                                    }}
+                                                    onMouseOver={(e) => e.target.style.background = '#16a34a'}
+                                                    onMouseOut={(e) => e.target.style.background = '#22c55e'}
+                                                >
+                                                    ➕ Tambah Siswa
+                                                </button>
+                                                <button 
+                                                    onClick={() => handleDelete(cls.id)}
+                                                    style={{ 
+                                                        background: 'transparent', 
+                                                        color: '#ef4444', 
+                                                        border: '1px solid #fecaca', 
+                                                        padding: '10px 16px', 
+                                                        borderRadius: '8px', 
+                                                        cursor: 'pointer', 
+                                                        fontSize: '0.9rem',
+                                                        transition: 'all 0.2s'
+                                                    }}
+                                                    onMouseOver={(e) => {e.target.style.background = '#fee2e2';}}
+                                                    onMouseOut={(e) => {e.target.style.background = 'transparent';}}
+                                                    title="Hapus Kelas"
+                                                >
+                                                    🗑️
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                    
+                                    {/* STUDENT TABLE */}
+                                    <div style={{ padding: '0' }}>
+                                        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                                            <thead>
+                                                <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #e2e8f0' }}>
+                                                    <th style={{ padding: '14px 20px', fontSize: '0.75rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>NIS</th>
+                                                    <th style={{ padding: '14px 20px', fontSize: '0.75rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Tingkat</th>
+                                                    <th style={{ padding: '14px 20px', fontSize: '0.75rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Nama Siswa</th>
+                                                    <th style={{ padding: '14px 20px', fontSize: '0.75rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Alamat</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {/* Tampilkan siswa langsung dari studentsPerClass */}
+                                                {(!studentsPerClass[cls.id] || studentsPerClass[cls.id].length === 0) ? (
+                                                    <tr>
+                                                        <td colSpan="4" style={{ padding: '24px', textAlign: 'center', color: '#94a3b8' }}>
+                                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                                                                <span>📭</span>
+                                                                <span>Belum ada siswa di kelas ini</span>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                ) : (
+                                                    studentsPerClass[cls.id].map((student, idx) => (
+                                                        <tr key={student.id} style={{ borderBottom: '1px solid #f1f5f9' }} className="hover:bg-slate-50">
+                                                            <td style={{ padding: '14px 20px', color: '#475569', fontWeight: '500' }}>{student.nis || '-'}</td>
+                                                            <td style={{ padding: '14px 20px', color: '#475569' }}>{getRomanGrade(cls.grade_level)}</td>
+                                                            <td style={{ padding: '14px 20px', color: '#334155', fontWeight: '600' }}>{student.name}</td>
+                                                            <td style={{ padding: '14px 20px', color: '#64748b' }}>{student.address || '-'}</td>
+                                                        </tr>
+                                                    ))
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    );
+                })()}
             </div>
 
             {/* MODAL MANAGE MEMBERS */}
@@ -358,21 +461,23 @@ const Classes = () => {
                             <button onClick={() => setManageClass(null)} className="hover:bg-slate-100 p-2 rounded-full transition-colors" style={{background:'none', border:'none', fontSize:'1.5rem', cursor:'pointer', color:'#94a3b8', lineHeight:1}}>&times;</button>
                         </div>
                         
-                        {/* ADD STUDENT FORM */}
-                        <form onSubmit={handleAddStudent} className="flex-center gap-3 mb-6 p-4 bg-slate-50 border border-slate-100 rounded-xl">
-                            <div className="flex-1">
-                                <select className="form-control" value={studentToAdd} onChange={e => setStudentToAdd(e.target.value)} required 
-                                    style={{background:'white'}}>
-                                    <option value="">-- Pilih Siswa Untuk Ditambahkan --</option>
-                                    {Array.isArray(availableStudents) && availableStudents.map(s => (
-                                        <option key={s.id} value={s.id}>
-                                            {s.name} {s.class_id ? `(Pindah dari Kelas #${s.class_id})` : '(Belum punya kelas)'}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                            <button type="submit" className="btn-primary" style={{width:'auto', whiteSpace:'nowrap', padding:'12px 20px', fontSize:'0.9rem'}}>+ Masukkan</button>
-                        </form>
+                        {/* ADD STUDENT FORM - Hanya untuk Admin/Guru */}
+                        {currentUser?.role !== 'student' && (
+                            <form onSubmit={handleAddStudent} className="flex-center gap-3 mb-6 p-4 bg-slate-50 border border-slate-100 rounded-xl">
+                                <div className="flex-1">
+                                    <select className="form-control" value={studentToAdd} onChange={e => setStudentToAdd(e.target.value)} required 
+                                        style={{background:'white'}}>
+                                        <option value="">-- Pilih Siswa Untuk Ditambahkan --</option>
+                                        {Array.isArray(availableStudents) && availableStudents.map(s => (
+                                            <option key={s.id} value={s.id}>
+                                                {s.name} {s.class_id ? `(Pindah dari Kelas #${s.class_id})` : '(Belum punya kelas)'}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <button type="submit" className="btn-primary" style={{width:'auto', whiteSpace:'nowrap', padding:'12px 20px', fontSize:'0.9rem'}}>+ Masukkan</button>
+                            </form>
+                        )}
 
                         {/* STUDENT LIST */}
                         <div style={{border:'1px solid #e2e8f0', borderRadius:'12px', overflow:'hidden'}}>

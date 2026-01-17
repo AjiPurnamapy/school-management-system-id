@@ -2,10 +2,11 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlmodel import Session, select, or_
 from backend.database import get_session
-from backend.models import Schedule, SchoolClass, Subject, User, DayEnum
+from backend.models import Schedule, SchoolClass, Subject, User, DayEnum, UserRole
 from backend.schemas.schedule import ScheduleCreate, ScheduleRead, ScheduleUpdate
 from backend.dependencies import get_current_user
 from backend.permissions import require_admin
+from backend.exceptions import PermissionDeniedError
 
 router = APIRouter(prefix="/schedules", tags=["Schedules (Jadwal)"])
 
@@ -16,6 +17,8 @@ def get_schedules(
     class_id: Optional[int] = None,
     teacher_id: Optional[int] = None,
     day: Optional[DayEnum] = None,
+    offset: int = Query(0, ge=0, description="Mulai dari data ke-"),
+    limit: int = Query(50, ge=1, le=100, description="Jumlah data per halaman"),
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
@@ -34,6 +37,9 @@ def get_schedules(
         start_stmt = start_stmt.where(Schedule.day == day)
         
     start_stmt = start_stmt.order_by(Schedule.day, Schedule.start_time)
+    
+    # Apply pagination
+    start_stmt = start_stmt.offset(offset).limit(limit)
 
     results = session.exec(start_stmt).all()
     
@@ -81,8 +87,15 @@ def validate_schedule_conflict(session: Session, class_id: int, teacher_id: int,
 def create_schedule(
     schedule: ScheduleCreate, 
     session: Session = Depends(get_session), 
-    admin: User = Depends(require_admin)
+    current_user: User = Depends(get_current_user)
 ):
+    """
+    Membuat jadwal pelajaran baru.
+    Permission: Admin & Principal
+    """
+    if current_user.role not in [UserRole.admin.value, UserRole.principal.value]:
+         raise PermissionDeniedError("membuat jadwal pelajaran")
+
     # 1. VALIDASI FORMAT JAM
     if schedule.end_time <= schedule.start_time:
         raise HTTPException(status_code=400, detail="Jam selesai harus lebih besar dari jam mulai")
@@ -99,11 +112,7 @@ def create_schedule(
     session.commit()
     session.refresh(db_schedule)
     
-    # Return enriched data (manual fetch for single item is fine, or use get with options)
-    # Since we just added it, relations might not be eager loaded automatically unless we refresh with options
-    # simpler to just return model_dump for now or fetch relations. 
-    # For consistency with list, let's fetch relations manually or re-query.
-    # Re-querying is cleaner for consistency.
+    # Return enriched data with eager loading
     return session.exec(
         select(Schedule).where(Schedule.id == db_schedule.id).options(
             selectinload(Schedule.school_class),
@@ -112,15 +121,18 @@ def create_schedule(
         )
     ).one()
 
-    # Old manual enrichment removed for consistency
 
 @router.put("/{schedule_id}", response_model=ScheduleRead)
 def update_schedule(
     schedule_id: int,
     schedule_update: ScheduleUpdate,
     session: Session = Depends(get_session),
-    admin: User = Depends(require_admin)
+    current_user: User = Depends(get_current_user)
 ):
+    """Update jadwal pelajaran."""
+    if current_user.role not in [UserRole.admin.value, UserRole.principal.value]:
+         raise PermissionDeniedError("mengupdate jadwal pelajaran")
+
     db_schedule = session.get(Schedule, schedule_id)
     if not db_schedule:
         raise HTTPException(status_code=404, detail="Jadwal tidak ditemukan")
@@ -162,12 +174,17 @@ def update_schedule(
         )
     ).one()
 
+
 @router.delete("/{schedule_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_schedule(
     schedule_id: int, 
     session: Session = Depends(get_session), 
-    admin: User = Depends(require_admin)
+    current_user: User = Depends(get_current_user)
 ):
+    """Menghapus jadwal pelajaran."""
+    if current_user.role not in [UserRole.admin.value, UserRole.principal.value]:
+         raise PermissionDeniedError("menghapus jadwal pelajaran")
+
     db_schedule = session.get(Schedule, schedule_id)
     if not db_schedule:
         raise HTTPException(status_code=404, detail="Jadwal tidak ditemukan")

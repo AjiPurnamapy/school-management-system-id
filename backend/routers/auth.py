@@ -14,7 +14,7 @@ from backend.database import get_session
 
 # ... (imports lainnya tetap sama, jangan dihapus) 
 from backend.schemas.user import ForgotPasswordRequest, ResetPasswordRequest
-from backend.schemas.user import UserCreate, UserRead
+from backend.schemas.user import UserCreate, UserRead, ProfileCompleteSchema
 from backend.schemas.token import Token
 from backend.models import User
 from backend.limiter import limiter
@@ -38,7 +38,9 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 router = APIRouter(tags=["Authentication"])
 
 @router.post("/register", response_model=UserRead)
+@limiter.limit("3/minute")  # SECURITY: Mencegah spam registrasi
 def create_user(
+    request: Request,  # Diperlukan oleh limiter
     user_input: UserCreate,
     background_tasks: BackgroundTasks,
     session: Session = Depends(get_session),
@@ -182,6 +184,30 @@ def login_for_access_token(
 def check_my_profile(current_user : User = Depends(get_current_user)):
     return current_user
 
+# Endpoint untuk melengkapi profil setelah registrasi
+@router.put("/complete-profile", response_model=UserRead)
+def complete_profile(
+    profile_data: ProfileCompleteSchema,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session)
+):
+    """
+    Endpoint untuk user (siswa/guru) melengkapi profil setelah registrasi.
+    Wajib diisi: NIS/NIP, alamat, nomor HP, tanggal lahir.
+    """
+    # Update field profil
+    current_user.nis = profile_data.nis
+    current_user.address = profile_data.address
+    current_user.phone = profile_data.phone
+    current_user.birth_date = profile_data.birth_date
+    current_user.is_profile_complete = True
+    
+    session.add(current_user)
+    session.commit()
+    session.refresh(current_user)
+    
+    return current_user
+
 
 @router.post("/upload-photo")
 async def upload_photo(
@@ -234,13 +260,15 @@ async def upload_photo(
 
 # FORGOT PASSWORD (REAL EMAIL)
 @router.post("/forgot-password")
+@limiter.limit("3/minute")  # SECURITY: Mencegah spam email reset password
 def forgot_password(
-    request: ForgotPasswordRequest,
+    request: Request,  # Diperlukan oleh limiter
+    data: ForgotPasswordRequest,
     background_tasks: BackgroundTasks,
     session: Session = Depends(get_session)
 ):
     # 1. Cari user
-    statement = select(User).where(User.email == request.email)
+    statement = select(User).where(User.email == data.email)
     user = session.exec(statement).first()
     
     # 2. Jika user tidak ketemu, return 404

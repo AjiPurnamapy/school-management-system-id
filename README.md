@@ -12,6 +12,7 @@
 *   **Kelas & Wali Kelas**: Admin/Kepala Sekolah dapat membuat kelas dan menunjuk Wali Kelas.
 *   **Mata Pelajaran (Subjects)**: Manajemen kurikulum mata pelajaran.
 *   **Jadwal Pelajaran**: Sistem penjadwalan otomatis dengan deteksi konflik waktu.
+*   **Tugas & PR (Assignments)**: Guru membuat tugas, siswa upload jawaban, dan grading otomatis.
 *   **Learning Management (LMS)**: Guru dapat upload materi (PDF, DOCX) untuk siswa.
 
 ### 2. Hierarki Role & Izin (RBAC)
@@ -19,7 +20,7 @@ Sistem memiliki 4 tingkatan akses yang ketat:
 1.  **Admin (IT/System)**: Kontrol penuh sistem, manajemen user, konfigurasi global.
 2.  **Principal (Kepala Sekolah)**: Manajemen akademik (Kelas, Guru, Jadwal).
 3.  **Teacher (Guru)**: Mengelola materi, melihat jadwal, dan siswa di kelasnya.
-4.  **Student (Siswa)**: Akses materi pelajaran, jadwal, dan tugas.
+4.  **Student (Siswa)**: Akses materi pelajaran, jadwal, dan mengirim tugas.
 
 ### 3. Keamanan & Performa
 *   **Secure Auth**: OAuth2 dengan JWT, Hashing Password (Bcrypt + Pepper).
@@ -30,6 +31,7 @@ Sistem memiliki 4 tingkatan akses yang ketat:
 ### 4. Fitur Produktivitas
 *   **Smart Notes**: Catatan pribadi untuk setiap user dengan pencarian real-time.
 *   **Cloud Storage**: Penyimpanan file pribadi terintegrasi.
+*   **User Profile**: Manajemen profil lengkap (Foto, Alamat, Kontak) dengan validasi.
 
 ---
 
@@ -62,6 +64,8 @@ Dokumentasi interaktif (Swagger UI) tersedia di: `http://localhost:8000/docs`
 | **Classes** | `/classes/*` | CRUD Kelas & Wali Kelas (Admin/Principal) |
 | **Subjects** | `/subjects/*` | Manajemen Mata Pelajaran |
 | **Schedules** | `/schedules/*` | Penjadwalan & Konflik Checker |
+| **Assignments**| `/assignments/*` | Pembuatan & Manajemen Tugas |
+| **Submissions**| `/submissions/*` | Pengumpulan & Penilaian Tugas |
 | **Materials** | `/materials/*` | Upload & Download Materi Pelajaran |
 | **Notes** | `/notes/*` | Catatan Pribadi User |
 | **Files** | `/files/*` | Personal Cloud Storage |

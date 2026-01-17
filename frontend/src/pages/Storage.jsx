@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useToast } from '../contexts/ToastContext';
+import { useConfirm } from '../contexts/ConfirmContext';
 
 const Storage = () => {
     const [files, setFiles] = useState([]);
     const [loading, setLoading] = useState(true);
     const [uploading, setUploading] = useState(false);
     const [error, setError] = useState('');
+    const { toast } = useToast();
+    const { confirm } = useConfirm();
 
     // Fetch Files saat komponen di-load
     useEffect(() => {
@@ -39,7 +43,7 @@ const Storage = () => {
 
         // Validasi ukuran (misal max 5MB)
         if (file.size > 5 * 1024 * 1024) {
-            alert("Ukuran file terlalu besar (Max 5MB)");
+            toast.warning("Ukuran file terlalu besar (Max 5MB)");
             return;
         }
 
@@ -55,28 +59,35 @@ const Storage = () => {
                     'Content-Type': 'multipart/form-data'
                 }
             });
+            toast.success("File berhasil diupload!");
             // Refresh list setelah upload
             fetchFiles(); 
         } catch (err) {
             console.error(err);
-            alert("Gagal upload file!");
+            toast.error("Gagal upload file!");
         } finally {
             setUploading(false);
         }
     };
 
     const handleDelete = async (fileId) => {
-        if (!window.confirm("Yakin hapus file ini?")) return;
+        const confirmed = await confirm({
+            title: 'Hapus File',
+            message: 'Yakin hapus file ini?',
+            confirmText: 'Ya, Hapus',
+            type: 'danger'
+        });
+        if (!confirmed) return;
 
         try {
             const token = localStorage.getItem('token');
             await axios.delete(`/files/${fileId}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            // Hapus dari state lokal
+            toast.success("File berhasil dihapus!");
             setFiles(files.filter(f => f.id !== fileId));
         } catch (err) {
-            alert("Gagal menghapus file");
+            toast.error("Gagal menghapus file");
         }
     };
 
@@ -105,8 +116,8 @@ const Storage = () => {
                 <div className="upload-btn-wrapper">
                     <label className={`btn-primary ${uploading ? 'disabled' : ''}`} style={{
                         cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', 
-                        width: 'auto', padding: '12px 24px', background: '#4f46e5',
-                        boxShadow: '0 4px 12px rgba(79, 70, 229, 0.2)'
+                        width: 'auto', padding: '12px 24px', background: '#22c55e',
+                        boxShadow: '0 4px 12px rgba(34, 197, 94, 0.2)'
                     }}>
                         {uploading ? (
                             <>
@@ -148,7 +159,7 @@ const Storage = () => {
                     padding: '10px 0' 
                 }}>
                     {files.map((file, index) => (
-                        <div key={file.id} className="glass-card hover-card" style={{ padding: '20px', position: 'relative', transition: 'all 0.2s', borderLeft: '4px solid #4f46e5', animationDelay: `${index * 50}ms` }}>
+                        <div key={file.id} className="glass-card hover-card" style={{ padding: '20px', position: 'relative', transition: 'all 0.2s', borderLeft: '4px solid #22c55e', animationDelay: `${index * 50}ms` }}>
                             <div className="flex-between align-start">
                                 <div style={{ marginRight: '10px', width: '100%', overflow: 'hidden' }}>
                                     <h3 className="mt-0 text-lg mb-1 font-bold text-slate-800 line-clamp-1" title={file.filename}>

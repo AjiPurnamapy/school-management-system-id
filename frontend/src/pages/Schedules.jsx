@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useToast } from '../contexts/ToastContext';
+import { useConfirm } from '../contexts/ConfirmContext';
 
 const Schedules = () => {
     // Data State
@@ -38,6 +40,8 @@ const Schedules = () => {
     const [uploadingMaterial, setUploadingMaterial] = useState(false);
 
     const days = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+    const { toast } = useToast();
+    const { confirm } = useConfirm();
 
     useEffect(() => {
         fetchInitialData();
@@ -106,13 +110,13 @@ const Schedules = () => {
                 await axios.put(`/schedules/${editId}`, payload, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
-                alert("Jadwal berhasil diperbarui!");
+                toast.success("Jadwal berhasil diperbarui!");
             } else {
                 // CREATE
                 await axios.post('/schedules/', payload, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
-                alert("Jadwal berhasil ditambahkan!");
+                toast.success("Jadwal berhasil ditambahkan!");
             }
             
             closeForm();
@@ -120,7 +124,7 @@ const Schedules = () => {
         } catch (err) {
             console.error(err);
             const msg = err.response?.data?.detail || "Gagal menyimpan jadwal.";
-            alert(msg);
+            toast.error(msg);
         }
     };
 
@@ -146,16 +150,24 @@ const Schedules = () => {
     };
 
     const handleDelete = async (id) => {
-        if (!window.confirm("Hapus jadwal ini?")) return;
+        const confirmed = await confirm({
+            title: 'Hapus Jadwal',
+            message: 'Hapus jadwal ini?',
+            confirmText: 'Ya, Hapus',
+            type: 'danger'
+        });
+        if (!confirmed) return;
+        
         const token = localStorage.getItem('token');
         try {
             await axios.delete(`/schedules/${id}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
+            toast.success("Jadwal berhasil dihapus!");
             fetchSchedules(selectedClass);
         } catch (err) {
             console.error(err);
-            alert("Gagal menghapus jadwal.");
+            toast.error("Gagal menghapus jadwal.");
         }
     };
 
@@ -181,7 +193,7 @@ const Schedules = () => {
             setMaterials(res.data);
         } catch (err) {
             console.error(err);
-            alert('Gagal memuat daftar materi.');
+            toast.error('Gagal memuat daftar materi.');
         } finally {
             setLoadingMaterials(false);
         }
@@ -206,7 +218,7 @@ const Schedules = () => {
     const handleUploadMaterial = async (e) => {
         e.preventDefault();
         if (!materialFile) {
-            alert('Pilih file terlebih dahulu!');
+            toast.warning('Pilih file terlebih dahulu!');
             return;
         }
         
@@ -227,7 +239,7 @@ const Schedules = () => {
                 }
             });
             
-            alert('Materi berhasil diupload!');
+            toast.success('Materi berhasil diupload!');
             
             // Reset form dan refresh list
             setMaterialTitle('');
@@ -243,7 +255,7 @@ const Schedules = () => {
         } catch (err) {
             console.error(err);
             const msg = err.response?.data?.detail || 'Gagal upload materi.';
-            alert(msg);
+            toast.error(msg);
         } finally {
             setUploadingMaterial(false);
         }
@@ -253,19 +265,24 @@ const Schedules = () => {
      * Hapus materi dengan konfirmasi.
      */
     const handleDeleteMaterial = async (materialId) => {
-        if (!window.confirm('Hapus materi ini?')) return;
+        const confirmed = await confirm({
+            title: 'Hapus Materi',
+            message: 'Hapus materi ini?',
+            confirmText: 'Ya, Hapus',
+            type: 'danger'
+        });
+        if (!confirmed) return;
         
         const token = localStorage.getItem('token');
         try {
             await axios.delete(`/materials/${materialId}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            
-            // Refresh list
+            toast.success("Materi berhasil dihapus!");
             setMaterials(materials.filter(m => m.id !== materialId));
         } catch (err) {
             console.error(err);
-            alert('Gagal menghapus materi.');
+            toast.error('Gagal menghapus materi.');
         }
     };
 
@@ -289,12 +306,12 @@ const Schedules = () => {
                      <p className="text-muted m-0">Atur jadwal mingguan per kelas.</p>
                 </div>
                 {/* Action Button: Always Visible for better UX */}
-                {/* Action Button: Only for Admin */}
-                 {currentUser?.role === 'admin' && (
+                {/* Action Button: Only for Admin & Principal */}
+                 {(currentUser?.role === 'admin' || currentUser?.role === 'principal') && (
                      <button 
                         onClick={() => {
                             if (!selectedClass) {
-                                alert("⚠️ Mohon pilih kelas terlebih dahulu sebelum menambah jadwal!");
+                                toast.warning("⚠️ Mohon pilih kelas terlebih dahulu sebelum menambah jadwal!");
                                 return;
                             }
                             closeForm(); 
@@ -305,7 +322,7 @@ const Schedules = () => {
                         style={{ 
                             width: 'auto', 
                             padding: '10px 24px', 
-                            background: '#4f46e5',
+                            background: '#22c55e',
                             cursor: selectedClass ? 'pointer' : 'not-allowed'
                         }}
                      >
@@ -357,74 +374,169 @@ const Schedules = () => {
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
-                            {days.map((day, index) => (
-                                <div key={day} className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-all" 
-                                     style={{animationDelay: `${index * 50}ms`}}>
-                                    {/* Simple Header */}
-                                    <div className="p-3 bg-slate-100 border-b border-slate-200 text-center font-bold text-slate-700 uppercase tracking-wide text-sm">
-                                        {day}
-                                    </div>
-                                    
-                                    <div className="p-4 min-h-[100px]">
-                                        {getSchedulesByDay(day).length === 0 ? (
-                                            <div className="text-center py-6">
-                                                <p className="text-slate-400 text-xs italic m-0">Tidak ada jadwal</p>
+                            {/* Flatten schedules based on days order */}
+                            {(() => {
+                                const allSchedules = days.flatMap(day => 
+                                    getSchedulesByDay(day).map(sch => ({...sch, day_name: day}))
+                                );
+
+                                if (allSchedules.length === 0) {
+                                    return (
+                                        <div className="col-span-full text-center py-20 px-6 bg-slate-50 rounded-2xl border border-dashed border-slate-300">
+                                            <p className="text-slate-500 text-lg">📭 Belum ada jadwal untuk kelas ini.</p>
+                                        </div>
+                                    );
+                                }
+
+                                return allSchedules.map((sch, index) => (
+                                    <div key={sch.id} style={{
+                                        padding: '20px',
+                                        borderRadius: '20px',
+                                        background: 'white',
+                                        border: '1px solid #e2e8f0',
+                                        boxShadow: '0 0 20px rgba(0,0,0,0.03)',
+                                        transition: 'all 0.2s ease',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: '16px',
+                                        animationDelay: `${index * 50}ms`
+                                    }}
+                                    className="hover:shadow-lg hover:-translate-y-1 hover:border-green-200"
+                                    >
+                                        
+                                        {/* HEADER: Subject (Left) & Actions (Right) */}
+                                        <div className="flex justify-between items-start">
+                                            <h4 style={{
+                                                fontSize: '1.25rem', // Lebih besar
+                                                fontWeight: '700',
+                                                color: '#1e293b',
+                                                margin: 0,
+                                                lineHeight: '1.3'
+                                            }}>
+                                                {sch.subject_name}
+                                            </h4>
+
+                                            {/* Action Buttons */}
+                                            {(currentUser?.role === 'admin' || currentUser?.role === 'principal') && (
+                                                <div className="flex gap-2">
+                                                    <button 
+                                                        onClick={() => handleEdit(sch)}
+                                                        title="Edit Jadwal"
+                                                        style={{ 
+                                                            width: '32px', height: '32px', borderRadius: '10px',
+                                                            border: 'none', background: '#f1f5f9', color: '#64748b',
+                                                            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                            transition: 'all 0.2s', fontSize: '16px'
+                                                        }}
+                                                        onMouseOver={(e) => {e.currentTarget.style.background = '#22c55e'; e.currentTarget.style.color='white';}}
+                                                        onMouseOut={(e) => {e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color='#64748b';}}
+                                                    >
+                                                        ✏️
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => handleDelete(sch.id)}
+                                                        title="Hapus Jadwal"
+                                                        style={{ 
+                                                            width: '32px', height: '32px', borderRadius: '10px',
+                                                            border: 'none', background: '#fee2e2', color: '#ef4444',
+                                                            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                            transition: 'all 0.2s', fontSize: '16px'
+                                                        }}
+                                                        onMouseOver={(e) => {e.currentTarget.style.background = '#ef4444'; e.currentTarget.style.color='white';}}
+                                                        onMouseOut={(e) => {e.currentTarget.style.background = '#fee2e2'; e.currentTarget.style.color='#ef4444';}}
+                                                    >
+                                                        🗑️
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* BODY: Info Bar (Day & Time) & Teacher */}
+                                        <div className="flex flex-col gap-3">
+                                            {/* Day & Time Badge */}
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <span style={{
+                                                    fontSize: '0.85rem',
+                                                    fontWeight: '600',
+                                                    color: '#22c55e',
+                                                    background: '#dcfce7',
+                                                    padding: '6px 12px',
+                                                    borderRadius: '8px',
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '6px'
+                                                }}>
+                                                    🗓️ {sch.day_name}
+                                                </span>
+                                                <span style={{
+                                                    fontSize: '0.85rem',
+                                                    fontWeight: '600',
+                                                    color: '#64748b',
+                                                    background: '#f1f5f9',
+                                                    padding: '6px 12px',
+                                                    borderRadius: '8px',
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '6px'
+                                                }}>
+                                                    ⏰ {sch.start_time} - {sch.end_time}
+                                                </span>
                                             </div>
-                                        ) : (
-                                            <div className="flex flex-col gap-3">
-                                                {getSchedulesByDay(day).map(sch => (
-                                                    <div key={sch.id} className="p-3 rounded-lg border border-slate-100 bg-slate-50 relative group hover:bg-white hover:border-indigo-200 transition-colors">
-                                                        
-                                                        {/* Time & Action */}
-                                                        <div className="flex justify-between items-start mb-1">
-                                                            <span className="text-xs font-mono font-bold text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200">
-                                                                {sch.start_time} - {sch.end_time}
-                                                            </span>
-                                                            <div className="flex gap-1">
-                                                                <button 
-                                                                    onClick={() => handleEdit(sch)}
-                                                                    className="text-slate-300 hover:text-blue-500 transition-colors"
-                                                                    title="Edit"
-                                                                    /* Disable edit for non-admin on button click, better hidden though */
-                                                                    style={{ display: currentUser?.role === 'admin' ? 'block' : 'none' }}
-                                                                >
-                                                                    ✏️
-                                                                </button>
-                                                                <button 
-                                                                    onClick={() => handleDelete(sch.id)}
-                                                                    className="text-slate-300 hover:text-red-500 transition-colors"
-                                                                    title="Hapus"
-                                                                    style={{ display: currentUser?.role === 'admin' ? 'block' : 'none' }}
-                                                                >
-                                                                    &times;
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                        
-                                                        {/* Subject */}
-                                                        <h4 className="text-sm font-bold text-slate-800 m-0 mb-1 leading-tight">
-                                                            {sch.subject_name}
-                                                        </h4>
-                                                        
-                                                        {/* Teacher */}
-                                                        <p className="text-xs text-slate-500 m-0 flex items-center gap-1">
-                                                            <span>👨‍🏫</span> {sch.teacher_name}
-                                                        </p>
-                                                        
-                                                        {/* TOMBOL MATERI (NEW) */}
-                                                        <button 
-                                                            onClick={() => openMaterialModal(sch)}
-                                                            className="mt-2 w-full text-xs py-1.5 px-3 rounded-lg border border-indigo-200 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 transition-colors flex items-center justify-center gap-1"
-                                                        >
-                                                            📎 Materi
-                                                        </button>
-                                                    </div>
-                                                ))}
+
+                                            {/* Teacher */}
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                <div style={{
+                                                    width: '32px', height: '32px', borderRadius: '50%', background: '#e0f2fe',
+                                                    color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px'
+                                                }}>👨‍🏫</div>
+                                                <div>
+                                                    <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: '600', color: '#334155' }}>
+                                                        {sch.teacher_name}
+                                                    </p>
+                                                    <p style={{ margin: 0, fontSize: '0.75rem', color: '#94a3b8' }}>Pengajar</p>
+                                                </div>
                                             </div>
-                                        )}
+                                        </div>
+                                        
+                                        {/* FOOTER: Material Button */}
+                                        <div style={{ marginTop: 'auto', paddingTop: '10px' }}>
+                                            <button 
+                                                onClick={() => openMaterialModal(sch)}
+                                                style={{
+                                                    width: '100%',
+                                                    padding: '12px',
+                                                    borderRadius: '12px',
+                                                    background: 'white',
+                                                    border: '1px solid #22c55e',
+                                                    color: '#22c55e',
+                                                    fontWeight: '600',
+                                                    fontSize: '0.9rem',
+                                                    cursor: 'pointer',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    gap: '8px',
+                                                    transition: 'all 0.2s'
+                                                }}
+                                                onMouseOver={(e) => {
+                                                    e.currentTarget.style.background = '#22c55e';
+                                                    e.currentTarget.style.color = 'white';
+                                                    e.currentTarget.style.boxShadow = '0 6px 20px rgba(34, 197, 94, 0.25)';
+                                                    e.currentTarget.style.transform = 'translateY(-2px)';
+                                                }}
+                                                onMouseOut={(e) => {
+                                                    e.currentTarget.style.background = 'white';
+                                                    e.currentTarget.style.color = '#22c55e';
+                                                    e.currentTarget.style.boxShadow = 'none';
+                                                    e.currentTarget.style.transform = 'translateY(0)';
+                                                }}
+                                            >
+                                                <span>📚</span> {currentUser?.role === 'student' ? 'Lihat Materi' : 'Upload Materi & Tugas'}
+                                            </button>
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
+                                ));
+                            })()}
                         </div>
                     )
                 ) : (
@@ -558,7 +670,7 @@ const Schedules = () => {
                                             {/* File Info */}
                                             <div className="flex items-center gap-3 flex-1 min-w-0">
                                                 {/* Icon berdasarkan tipe file */}
-                                                <div className="w-10 h-10 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center text-lg flex-shrink-0">
+                                                <div className="w-10 h-10 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center text-lg flex-shrink-0">
                                                     {mat.file_type === 'pdf' ? '📄' : 
                                                      ['mp4', 'webm', 'mov'].includes(mat.file_type) ? '🎬' :
                                                      ['jpg', 'jpeg', 'png', 'gif'].includes(mat.file_type) ? '🖼️' :
@@ -578,16 +690,19 @@ const Schedules = () => {
                                                     href={mat.file_url} 
                                                     target="_blank" 
                                                     rel="noopener noreferrer"
-                                                    className="px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 transition-colors"
+                                                    className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 transition-colors"
                                                 >
                                                     ⬇️ Download
                                                 </a>
-                                                <button 
-                                                    onClick={() => handleDeleteMaterial(mat.id)}
-                                                    className="px-3 py-1.5 rounded-lg border border-red-200 text-red-600 text-xs font-bold hover:bg-red-50 transition-colors"
-                                                >
-                                                    🗑️
-                                                </button>
+                                                {/* Hanya Admin/Guru yang bisa hapus materi */}
+                                                {currentUser?.role !== 'student' && (
+                                                    <button 
+                                                        onClick={() => handleDeleteMaterial(mat.id)}
+                                                        className="px-3 py-1.5 rounded-lg border border-red-200 text-red-600 text-xs font-bold hover:bg-red-50 transition-colors"
+                                                    >
+                                                        🗑️
+                                                    </button>
+                                                )}
                                             </div>
                                         </div>
                                     ))}
@@ -595,58 +710,60 @@ const Schedules = () => {
                             )}
                         </div>
                         
-                        {/* FORM UPLOAD MATERI BARU */}
-                        <div className="pt-6 border-t border-slate-200">
-                            <h4 className="text-sm font-bold text-slate-600 mb-4 uppercase tracking-wide">⬆️ Upload Materi Baru</h4>
-                            
-                            <form onSubmit={handleUploadMaterial}>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                    <div className="form-group mb-0">
-                                        <label className="form-label text-sm font-bold text-slate-700">Judul Materi *</label>
-                                        <input 
-                                            type="text" 
-                                            className="form-control" 
-                                            placeholder="Contoh: Materi Bab 1 - Pengenalan"
-                                            value={materialTitle}
-                                            onChange={e => setMaterialTitle(e.target.value)}
-                                            required
-                                            maxLength={200}
-                                        />
+                        {/* FORM UPLOAD MATERI BARU - Hanya untuk Guru/Admin */}
+                        {currentUser?.role !== 'student' && (
+                            <div className="pt-6 border-t border-slate-200">
+                                <h4 className="text-sm font-bold text-slate-600 mb-4 uppercase tracking-wide">⬆️ Upload Materi Baru</h4>
+                                
+                                <form onSubmit={handleUploadMaterial}>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                        <div className="form-group mb-0">
+                                            <label className="form-label text-sm font-bold text-slate-700">Judul Materi *</label>
+                                            <input 
+                                                type="text" 
+                                                className="form-control" 
+                                                placeholder="Contoh: Materi Bab 1 - Pengenalan"
+                                                value={materialTitle}
+                                                onChange={e => setMaterialTitle(e.target.value)}
+                                                required
+                                                maxLength={200}
+                                            />
+                                        </div>
+                                        <div className="form-group mb-0">
+                                            <label className="form-label text-sm font-bold text-slate-700">Pilih File *</label>
+                                            <input 
+                                                type="file" 
+                                                className="form-control"
+                                                onChange={e => setMaterialFile(e.target.files[0])}
+                                                accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.jpg,.jpeg,.png,.gif,.webp,.mp4,.webm,.mov,.mp3,.wav,.ogg"
+                                            />
+                                            <p className="text-xs text-slate-400 m-0 mt-1">Max 50MB. Format: PDF, DOC, PPT, Video, dll.</p>
+                                        </div>
                                     </div>
-                                    <div className="form-group mb-0">
-                                        <label className="form-label text-sm font-bold text-slate-700">Pilih File *</label>
-                                        <input 
-                                            type="file" 
+                                    
+                                    <div className="form-group mb-4">
+                                        <label className="form-label text-sm font-bold text-slate-700">Deskripsi (Opsional)</label>
+                                        <textarea 
                                             className="form-control"
-                                            onChange={e => setMaterialFile(e.target.files[0])}
-                                            accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.jpg,.jpeg,.png,.gif,.webp,.mp4,.webm,.mov,.mp3,.wav,.ogg"
+                                            placeholder="Penjelasan singkat tentang materi ini..."
+                                            value={materialDesc}
+                                            onChange={e => setMaterialDesc(e.target.value)}
+                                            rows={2}
+                                            maxLength={1000}
                                         />
-                                        <p className="text-xs text-slate-400 m-0 mt-1">Max 50MB. Format: PDF, DOC, PPT, Video, dll.</p>
                                     </div>
-                                </div>
-                                
-                                <div className="form-group mb-4">
-                                    <label className="form-label text-sm font-bold text-slate-700">Deskripsi (Opsional)</label>
-                                    <textarea 
-                                        className="form-control"
-                                        placeholder="Penjelasan singkat tentang materi ini..."
-                                        value={materialDesc}
-                                        onChange={e => setMaterialDesc(e.target.value)}
-                                        rows={2}
-                                        maxLength={1000}
-                                    />
-                                </div>
-                                
-                                <button 
-                                    type="submit" 
-                                    className="btn-primary w-full"
-                                    disabled={uploadingMaterial || !materialTitle || !materialFile}
-                                    style={{ opacity: (uploadingMaterial || !materialTitle || !materialFile) ? 0.6 : 1 }}
-                                >
-                                    {uploadingMaterial ? '⏳ Mengupload...' : '⬆️ Upload Materi'}
-                                </button>
-                            </form>
-                        </div>
+                                    
+                                    <button 
+                                        type="submit" 
+                                        className="btn-primary w-full"
+                                        disabled={uploadingMaterial || !materialTitle || !materialFile}
+                                        style={{ opacity: (uploadingMaterial || !materialTitle || !materialFile) ? 0.6 : 1 }}
+                                    >
+                                        {uploadingMaterial ? '⏳ Mengupload...' : '⬆️ Upload Materi'}
+                                    </button>
+                                </form>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

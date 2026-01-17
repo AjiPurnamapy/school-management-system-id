@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from starlette.middleware.sessions import SessionMiddleware
-from backend.routers import notes, auth, files, classes, users, subjects, schedules, materials
+from backend.routers import notes, auth, files, classes, users, subjects, schedules, materials, assignments, submissions
 from backend.database import engine, create_db_and_tables
 from backend.admin import setup_admin
 from slowapi import _rate_limit_exceeded_handler
@@ -107,6 +107,8 @@ app.include_router(users.router)   # Router Users
 app.include_router(subjects.router) # Router Mapel
 app.include_router(schedules.router) # Router Jadwal
 app.include_router(materials.router) # Router Materi Pelajaran (LMS)
+app.include_router(assignments.router) # Router Tugas (LMS)
+app.include_router(submissions.router) # Router Pengumpulan Tugas (LMS)
 
 # pasang admin panel
 setup_admin(app, engine)
