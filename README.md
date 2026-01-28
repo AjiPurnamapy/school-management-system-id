@@ -14,6 +14,8 @@
 *   **Jadwal Pelajaran**: Sistem penjadwalan otomatis dengan deteksi konflik waktu.
 *   **Tugas & PR (Assignments)**: Guru membuat tugas, siswa upload jawaban, dan grading otomatis.
 *   **Learning Management (LMS)**: Guru dapat upload materi (PDF, DOCX) untuk siswa.
+*   **Sistem Absensi**: Absensi harian per jadwal dengan bulk create, rekap per siswa/kelas.
+*   **Analytics Dashboard**: Statistik real-time (total siswa, guru, tugas, kehadiran).
 
 ### 2. Hierarki Role & Izin (RBAC)
 Sistem memiliki 4 tingkatan akses yang ketat:
@@ -69,6 +71,8 @@ Dokumentasi interaktif (Swagger UI) tersedia di: `http://localhost:8000/docs`
 | **Materials** | `/materials/*` | Upload & Download Materi Pelajaran |
 | **Notes** | `/notes/*` | Catatan Pribadi User |
 | **Files** | `/files/*` | Personal Cloud Storage |
+| **Analytics** | `/analytics/*` | Dashboard Statistik (Siswa, Guru, Tugas) |
+| **Attendance** | `/attendance/*` | Sistem Absensi Harian (CRUD + Bulk) |
 
 ---
 

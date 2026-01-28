@@ -38,6 +38,13 @@ const Assignments = () => {
     const [gradeValue, setGradeValue] = useState('');
     const [feedbackValue, setFeedbackValue] = useState('');
 
+    // Student's own submissions (for checkmark display)
+    const [mySubmissions, setMySubmissions] = useState([]);
+    
+    // View Submission Modal (for student to see their own submission)
+    const [showViewModal, setShowViewModal] = useState(false);
+    const [viewingSubmission, setViewingSubmission] = useState(null);
+
     const { toast } = useToast();
     const { confirm } = useConfirm();
 
@@ -60,10 +67,33 @@ const Assignments = () => {
             setClasses(resClasses.data);
             setSubjects(resSubjects.data);
             setCurrentUser(resProfile.data);
+            
+            // Fetch student's own submissions (for checkmark display)
+            if (resProfile.data.role === 'student') {
+                try {
+                    const resSubs = await axios.get('/submissions/my', {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    setMySubmissions(resSubs.data);
+                } catch (e) {
+                    console.warn("Failed to fetch my submissions:", e);
+                }
+            }
         } catch (err) {
             console.error(err);
             toast.error("Gagal memuat data awal");
         }
+    };
+
+    // Helper: Check if current student has submitted this assignment
+    const getMySubmissionFor = (assignmentId) => {
+        return mySubmissions.find(s => s.assignment_id === assignmentId);
+    };
+
+    // Open view modal for student's own submission
+    const openViewSubmission = (submission) => {
+        setViewingSubmission(submission);
+        setShowViewModal(true);
     };
 
     const fetchAssignments = async () => {
@@ -235,7 +265,11 @@ const Assignments = () => {
                         {isCreating ? '✨ Buat Tugas Baru' : 'Tugas & PR 📝'}
                     </h2>
                     <p className="text-slate-500 m-0">
-                        {isCreating ? 'Isi detail tugas untuk siswa.' : 'Kelola tugas harian dan tenggat waktu.'}
+                        {isCreating 
+                            ? 'Isi detail tugas untuk siswa.' 
+                            : (currentUser?.role === 'student' 
+                                ? 'Lihat dan kerjakan tugas dari guru.' 
+                                : 'Kelola tugas harian dan tenggat waktu.')}
                     </p>
                 </div>
                 {isTeacherOrAdmin && !isCreating && (
@@ -249,151 +283,266 @@ const Assignments = () => {
                 )}
             </div>
 
-            {/* CREATE FORM - INLINE */}
-            {isCreating ? (
-                <div className="animate-fade-in bg-slate-50 rounded-2xl p-6 border border-slate-200">
-                    <form onSubmit={handleCreateAssignment}>
-                        <div className="space-y-5">
-                            {/* Judul */}
-                            <div>
-                                <label className="block text-sm font-bold text-slate-700 mb-2">
-                                    Judul Tugas <span className="text-red-500">*</span>
-                                </label>
-                                <input 
-                                    type="text" 
-                                    className="form-control w-full px-4 py-2.5 rounded-xl border-slate-200 focus:border-emerald-500 focus:ring-emerald-500 bg-white h-[46px]" 
-                                    value={title} 
-                                    onChange={e => setTitle(e.target.value)} 
-                                    required 
-                                    placeholder="Contoh: Latihan Soal Matematika Bab 1" 
-                                />
+            {/* CREATE ASSIGNMENT MODAL */}
+            {isCreating && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: 'rgba(15, 23, 42, 0.7)',
+                    backdropFilter: 'blur(4px)',
+                    zIndex: 9999,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '20px'
+                }}>
+                    <div style={{
+                        background: 'white',
+                        borderRadius: '20px',
+                        width: '100%',
+                        maxWidth: '600px',
+                        maxHeight: '90vh',
+                        overflow: 'hidden',
+                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                        display: 'flex',
+                        flexDirection: 'column'
+                    }}>
+                        {/* Header */}
+                        <div style={{
+                            padding: '24px 28px',
+                            borderBottom: '1px solid #e2e8f0',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '16px'
+                        }}>
+                            <div style={{
+                                width: '48px', height: '48px', borderRadius: '14px',
+                                background: 'linear-gradient(135deg, #22c55e, #16a34a)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                fontSize: '24px', flexShrink: 0
+                            }}>✨</div>
+                            <div style={{ flex: 1 }}>
+                                <h3 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#1e293b', margin: 0 }}>
+                                    Buat Tugas Baru
+                                </h3>
+                                <p style={{ fontSize: '0.875rem', color: '#64748b', margin: '4px 0 0 0' }}>
+                                    Isi detail tugas untuk siswa
+                                </p>
                             </div>
-                            
-                            {/* Grid 1: Kelas & Mapel */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <button 
+                                onClick={() => { setIsCreating(false); resetForm(); }}
+                                style={{
+                                    width: '36px', height: '36px', borderRadius: '10px',
+                                    border: 'none', background: '#f1f5f9', color: '#64748b',
+                                    cursor: 'pointer', fontSize: '18px',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                }}
+                            >✕</button>
+                        </div>
+
+                        {/* Form Content */}
+                        <form onSubmit={handleCreateAssignment} style={{ 
+                            padding: '24px 28px', 
+                            overflowY: 'auto', 
+                            flex: 1 
+                        }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                                {/* Judul */}
                                 <div>
-                                    <label className="block text-sm font-bold text-slate-700 mb-2">
-                                        Kelas <span className="text-red-500">*</span>
+                                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>
+                                        Judul Tugas <span style={{ color: '#ef4444' }}>*</span>
                                     </label>
-                                    <div className="relative">
-                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-lg">🏫</span>
+                                    <input 
+                                        type="text" 
+                                        value={title} 
+                                        onChange={e => setTitle(e.target.value)} 
+                                        required 
+                                        placeholder="Contoh: Latihan Soal Matematika Bab 1"
+                                        style={{
+                                            width: '100%', padding: '12px 16px', borderRadius: '12px',
+                                            border: '1px solid #e2e8f0', fontSize: '0.9rem',
+                                            outline: 'none', boxSizing: 'border-box'
+                                        }}
+                                    />
+                                </div>
+
+                                {/* Grid: Kelas & Mapel */}
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                                    <div>
+                                        <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>
+                                            🏫 Kelas <span style={{ color: '#ef4444' }}>*</span>
+                                        </label>
                                         <select 
-                                            className="form-control w-full pl-10 pr-4 py-2.5 rounded-xl border-slate-200 focus:border-emerald-500 focus:ring-emerald-500 appearance-none bg-white h-[46px]" 
                                             value={formClass} 
                                             onChange={e => setFormClass(e.target.value)} 
                                             required
+                                            style={{
+                                                width: '100%', padding: '12px 16px', borderRadius: '12px',
+                                                border: '1px solid #e2e8f0', fontSize: '0.9rem',
+                                                outline: 'none', background: 'white', boxSizing: 'border-box'
+                                            }}
                                         >
                                             <option value="">Pilih Kelas</option>
                                             {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                         </select>
-                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">▼</span>
                                     </div>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-bold text-slate-700 mb-2">
-                                        Mata Pelajaran <span className="text-red-500">*</span>
-                                    </label>
-                                    <div className="relative">
-                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-lg">📚</span>
+                                    <div>
+                                        <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>
+                                            📚 Mata Pelajaran <span style={{ color: '#ef4444' }}>*</span>
+                                        </label>
                                         <select 
-                                            className="form-control w-full pl-10 pr-4 py-2.5 rounded-xl border-slate-200 focus:border-emerald-500 focus:ring-emerald-500 appearance-none bg-white h-[46px]" 
                                             value={formSubject} 
                                             onChange={e => setFormSubject(e.target.value)} 
                                             required
+                                            style={{
+                                                width: '100%', padding: '12px 16px', borderRadius: '12px',
+                                                border: '1px solid #e2e8f0', fontSize: '0.9rem',
+                                                outline: 'none', background: 'white', boxSizing: 'border-box'
+                                            }}
                                         >
                                             <option value="">Pilih Mapel</option>
                                             {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                                         </select>
-                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">▼</span>
                                     </div>
+                                </div>
+
+                                {/* Grid: Deadline & File */}
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                                    <div>
+                                        <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>
+                                            ⏰ Batas Waktu <span style={{ color: '#ef4444' }}>*</span>
+                                        </label>
+                                        <input 
+                                            type="datetime-local" 
+                                            value={dueDate} 
+                                            onChange={e => setDueDate(e.target.value)} 
+                                            required
+                                            style={{
+                                                width: '100%', padding: '12px 16px', borderRadius: '12px',
+                                                border: '1px solid #e2e8f0', fontSize: '0.9rem',
+                                                outline: 'none', boxSizing: 'border-box'
+                                            }}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>
+                                            📎 Lampiran (Opsional)
+                                        </label>
+                                        <label style={{
+                                            display: 'flex', alignItems: 'center', gap: '10px',
+                                            padding: '10px 16px', borderRadius: '12px',
+                                            border: '1px dashed #cbd5e1', background: '#f8fafc',
+                                            cursor: 'pointer', fontSize: '0.875rem', color: '#64748b'
+                                        }}>
+                                            <span>{file ? '✅' : '📄'}</span>
+                                            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                {file ? file.name : 'Pilih file...'}
+                                            </span>
+                                            <input 
+                                                type="file" 
+                                                style={{ display: 'none' }}
+                                                onChange={e => setFile(e.target.files[0])} 
+                                                accept=".pdf,.doc,.docx,.jpg,.png"
+                                            />
+                                        </label>
+                                    </div>
+                                </div>
+
+                                {/* Deskripsi */}
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>
+                                        Deskripsi / Instruksi <span style={{ color: '#ef4444' }}>*</span>
+                                    </label>
+                                    <textarea 
+                                        value={description} 
+                                        onChange={e => setDescription(e.target.value)} 
+                                        required 
+                                        placeholder="Tuliskan instruksi pengerjaan tugas secara detail di sini..."
+                                        style={{
+                                            width: '100%', padding: '12px 16px', borderRadius: '12px',
+                                            border: '1px solid #e2e8f0', fontSize: '0.9rem',
+                                            minHeight: '120px', resize: 'vertical',
+                                            outline: 'none', boxSizing: 'border-box'
+                                        }}
+                                    />
                                 </div>
                             </div>
 
-                                    {/* Grid 2: Deadline & File */}
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                        <div>
-                                            <label className="block text-sm font-bold text-slate-700 mb-2">
-                                                Batas Waktu (Deadline) <span className="text-red-500">*</span>
-                                            </label>
-                                            <input 
-                                                type="datetime-local" 
-                                                className="form-control w-full px-4 py-2.5 rounded-xl border-slate-200 focus:border-emerald-500 focus:ring-emerald-500 text-slate-600 bg-white h-[46px]" 
-                                                value={dueDate} 
-                                                onChange={e => setDueDate(e.target.value)} 
-                                                required 
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-bold text-slate-700 mb-2">
-                                                Lampiran (Opsional)
-                                            </label>
-                                            <label className="flex items-center gap-3 px-3 rounded-xl border border-slate-200 cursor-pointer hover:border-blue-400 hover:bg-blue-50/30 transition-all bg-white w-full h-[46px] group relative overflow-hidden">
-                                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-blue-50 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                                <span className="text-xl relative z-10 group-hover:scale-110 transition-transform text-slate-400 group-hover:text-blue-500">📎</span>
-                                                <span className="text-sm text-slate-500 group-hover:text-blue-600 font-medium truncate flex-1 relative z-10">
-                                                    {file ? file.name : "Upload Materi..."}
-                                                </span>
-                                                <span className="text-xs font-bold bg-slate-100 group-hover:bg-blue-500 text-slate-600 group-hover:text-white px-3 py-1.5 rounded-lg transition-all shadow-sm relative z-10">
-                                                    Browse File
-                                                </span>
-                                                <input 
-                                                    type="file" 
-                                                    className="hidden" 
-                                                    onChange={e => setFile(e.target.files[0])} 
-                                                    accept=".pdf,.doc,.docx,.jpg,.png" 
-                                                />
-                                            </label>
-                                        </div>
-                                    </div>
-
-                                    {/* Deskripsi */}
-                                    <div>
-                                        <label className="block text-sm font-bold text-slate-700 mb-2">
-                                            Deskripsi / Instruksi <span className="text-red-500">*</span>
-                                        </label>
-                                        <textarea 
-                                            className="form-control w-full px-4 py-3 h-32 rounded-xl border-slate-200 focus:border-emerald-500 focus:ring-emerald-500 resize-none bg-white" 
-                                            value={description} 
-                                            onChange={e => setDescription(e.target.value)} 
-                                            required 
-                                            placeholder="Tuliskan instruksi pengerjaan tugas secara detail di sini..."
-                                        ></textarea>
-                                    </div>
-                                </div>
-
-                                {/* Action Buttons */}
-                                <div className="flex gap-4 mt-8 pt-6 border-t border-slate-100">
-                                    <button 
-                                        type="button" 
-                                        onClick={() => setIsCreating(false)} 
-                                        className="flex-1 py-3 px-6 rounded-xl font-bold text-slate-500 bg-white border-2 border-slate-100 hover:border-red-100 hover:bg-red-50 hover:text-red-500 transition-all flex justify-center items-center gap-2"
-                                    >
-                                        <span>❌</span> Batal
-                                    </button>
-                                    <button 
-                                        type="submit" 
-                                        className="flex-1 py-3 px-6 rounded-xl font-bold text-white bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 shadow-lg shadow-emerald-200 hover:shadow-emerald-300 hover:-translate-y-0.5 transition-all transform flex justify-center items-center gap-2"
-                                    >
-                                        <span>💾</span> Simpan Tugas
-                                    </button>
-                                </div>
-                    </form>
+                            {/* Action Buttons */}
+                            <div style={{ 
+                                display: 'flex', gap: '12px', marginTop: '24px', 
+                                paddingTop: '20px', borderTop: '1px solid #e2e8f0' 
+                            }}>
+                                <button 
+                                    type="button" 
+                                    onClick={() => { setIsCreating(false); resetForm(); }}
+                                    style={{
+                                        flex: 1, padding: '14px', borderRadius: '12px',
+                                        border: '1px solid #e2e8f0', background: 'white',
+                                        color: '#64748b', fontWeight: '600', fontSize: '0.9rem',
+                                        cursor: 'pointer', display: 'flex', alignItems: 'center',
+                                        justifyContent: 'center', gap: '8px'
+                                    }}
+                                >
+                                    ❌ Batal
+                                </button>
+                                <button 
+                                    type="submit"
+                                    disabled={loading}
+                                    style={{
+                                        flex: 1, padding: '14px', borderRadius: '12px',
+                                        border: 'none', 
+                                        background: 'linear-gradient(135deg, #22c55e, #16a34a)',
+                                        color: 'white', fontWeight: '600', fontSize: '0.9rem',
+                                        cursor: loading ? 'not-allowed' : 'pointer',
+                                        display: 'flex', alignItems: 'center',
+                                        justifyContent: 'center', gap: '8px',
+                                        boxShadow: '0 4px 15px rgba(34, 197, 94, 0.3)',
+                                        opacity: loading ? 0.7 : 1
+                                    }}
+                                >
+                                    {loading ? '⏳ Menyimpan...' : '💾 Simpan Tugas'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
-            ) : (
+            )}
+
+            {/* MAIN CONTENT */}
+            {!isCreating && (
                 <>
 
             {/* Filter */}
             <div className="mb-6 p-4 bg-slate-50 rounded-xl border border-slate-200 flex flex-wrap gap-4 items-center">
-                <div className="form-input-wrapper flex-1 min-w-[200px]">
-                    <span className="form-input-icon">🏫</span>
-                    <select 
-                        className="form-control with-icon"
-                        value={selectedClass} onChange={e => setSelectedClass(e.target.value)}
-                    >
-                        <option value="">-- Semua Kelas --</option>
-                        {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </select>
-                </div>
+                {/* Class Filter - Static for Students, Dropdown for Teachers/Admin */}
+                {currentUser?.role === 'student' ? (
+                    <div className="flex-1 min-w-[200px]">
+                        <div className="flex items-center gap-3 px-4 py-3 bg-white rounded-xl border border-slate-200">
+                            <span className="text-xl">🏫</span>
+                            <div>
+                                <p className="text-xs text-slate-400 m-0 font-medium">Kelas Saya</p>
+                                <p className="text-sm font-bold text-slate-700 m-0">
+                                    {classes.find(c => c.id === currentUser?.class_id)?.name || 'Belum terdaftar di kelas'}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="form-input-wrapper flex-1 min-w-[200px]">
+                        <span className="form-input-icon">🏫</span>
+                        <select 
+                            className="form-control with-icon"
+                            value={selectedClass} onChange={e => setSelectedClass(e.target.value)}
+                        >
+                            <option value="">-- Semua Kelas --</option>
+                            {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        </select>
+                    </div>
+                )}
                 <div className="form-input-wrapper flex-1 min-w-[200px]">
                     <span className="form-input-icon">📘</span>
                     <select 
@@ -414,64 +563,273 @@ const Assignments = () => {
                     <p className="text-slate-500 text-lg">📭 Belum ada tugas.</p>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {assignments.map(tugas => (
-                        <div key={tugas.id} className="glass-card p-5 border-l-4 border-l-emerald-500 hover:shadow-lg transition-all relative">
-                             {isTeacherOrAdmin && (
-                                <button 
-                                    onClick={() => handleDelete(tugas.id)}
-                                    className="absolute top-4 right-4 text-red-400 hover:text-red-600 p-1"
-                                    title="Hapus Tugas"
-                                >
-                                    🗑️
-                                </button>
-                             )}
-                            
-                            <div className="flex gap-2 mb-2">
-                                <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded text-xs font-bold">{tugas.class_name}</span>
-                                <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs font-bold">{tugas.subject_name}</span>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    {assignments.map((tugas, index) => (
+                        <div 
+                            key={tugas.id} 
+                            style={{
+                                background: 'white',
+                                borderRadius: '16px',
+                                padding: '20px',
+                                border: '1px solid #e2e8f0',
+                                borderLeft: '4px solid #22c55e',
+                                boxShadow: '0 0 20px rgba(0,0,0,0.03)',
+                                transition: 'all 0.2s ease',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '16px',
+                                animationDelay: `${index * 50}ms`
+                            }}
+                            className="hover:shadow-lg hover:-translate-y-1 hover:border-green-200 animate-fade-in"
+                        >
+                            {/* HEADER: Title (Left) & Actions/Download (Right) */}
+                            <div className="flex justify-between items-start">
+                                <div style={{ flex: 1, paddingRight: '10px' }}>
+                                    <h4 style={{
+                                        fontSize: '1.25rem',
+                                        fontWeight: '700',
+                                        color: '#1e293b',
+                                        margin: 0,
+                                        marginBottom: '8px',
+                                        lineHeight: '1.3'
+                                    }}>
+                                        {tugas.title}
+                                    </h4>
+                                    
+                                    {/* Class & Subject Badges - directly below title */}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                        <span style={{
+                                            fontSize: '0.8rem',
+                                            fontWeight: '600',
+                                            color: '#22c55e',
+                                            background: '#dcfce7',
+                                            padding: '4px 10px',
+                                            borderRadius: '6px',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '4px'
+                                        }}>
+                                            🏫 {tugas.class_name}
+                                        </span>
+                                        <span style={{
+                                            fontSize: '0.8rem',
+                                            fontWeight: '600',
+                                            color: '#3b82f6',
+                                            background: '#dbeafe',
+                                            padding: '4px 10px',
+                                            borderRadius: '6px',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '4px'
+                                        }}>
+                                            📚 {tugas.subject_name}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* Right Side: Delete Button & File Link */}
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
+                                    {isTeacherOrAdmin && (
+                                        <button 
+                                            onClick={() => handleDelete(tugas.id)}
+                                            title="Hapus Tugas"
+                                            style={{ 
+                                                width: '32px', height: '32px', borderRadius: '10px',
+                                                border: 'none', background: '#fee2e2', color: '#ef4444',
+                                                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                transition: 'all 0.2s', fontSize: '16px'
+                                            }}
+                                            onMouseOver={(e) => {e.currentTarget.style.background = '#ef4444'; e.currentTarget.style.color='white';}}
+                                            onMouseOut={(e) => {e.currentTarget.style.background = '#fee2e2'; e.currentTarget.style.color='#ef4444';}}
+                                        >
+                                            🗑️
+                                        </button>
+                                    )}
+                                    {tugas.file_url && (
+                                        <a href={tugas.file_url} target="_blank" rel="noopener noreferrer" 
+                                            style={{ 
+                                                fontSize: '0.75rem', 
+                                                color: '#3b82f6', 
+                                                textDecoration: 'none', 
+                                                display: 'inline-flex', 
+                                                alignItems: 'center', 
+                                                gap: '4px',
+                                                background: '#eff6ff',
+                                                padding: '4px 8px',
+                                                borderRadius: '6px',
+                                                fontWeight: '500'
+                                            }}
+                                            className="hover:underline"
+                                        >
+                                            📎 Lampiran
+                                        </a>
+                                    )}
+                                </div>
                             </div>
-                            
-                            <h3 className="text-lg font-bold text-slate-800 mb-2">{tugas.title}</h3>
-                            <p className="text-slate-600 text-sm mb-4 line-clamp-2">{tugas.description}</p>
-                            
-                            {/* File Link */}
-                            {tugas.file_url && (
-                                <a href={tugas.file_url} target="_blank" rel="noopener noreferrer" className="block mb-4 text-sm text-blue-600 hover:underline">
-                                    📎 Download Soal / Lampiran
-                                </a>
-                            )}
-                            
-                            <div className="flex justify-between items-center text-xs text-slate-500 border-t pt-3 mt-auto">
-                                <div className="flex items-center gap-1">
-                                    <span>📅 Deadline:</span>
-                                    <span className="font-bold text-red-500">
-                                        {new Date(tugas.due_date + 'Z').toLocaleString('id-ID', {
+
+                            {/* BODY: Description & Info */}
+                            <div className="flex flex-col gap-3">
+                                {/* Description */}
+                                <p style={{ margin: 0, fontSize: '0.9rem', color: '#64748b', lineHeight: '1.5' }} className="line-clamp-2">
+                                    {tugas.description}
+                                </p>
+
+                                {/* Teacher (Left) & Deadline (Right) */}
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                                    {/* Teacher */}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <div style={{
+                                            width: '28px', height: '28px', borderRadius: '50%', background: '#e0f2fe',
+                                            color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px'
+                                        }}>👨‍🏫</div>
+                                        <span style={{ fontSize: '0.85rem', fontWeight: '500', color: '#475569' }}>{tugas.teacher_name}</span>
+                                    </div>
+                                    
+                                    {/* Deadline */}
+                                    <span style={{
+                                        fontSize: '0.85rem',
+                                        fontWeight: '600',
+                                        color: '#ef4444',
+                                        background: '#fef2f2',
+                                        padding: '6px 12px',
+                                        borderRadius: '8px',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '6px'
+                                    }}>
+                                        📅 {new Date(tugas.due_date + 'Z').toLocaleString('id-ID', {
                                             day: 'numeric', month: 'short', hour: '2-digit', minute:'2-digit'
                                         })}
                                     </span>
                                 </div>
-                                <div className="flex items-center gap-1">
-                                    <span>👨‍🏫 {tugas.teacher_name}</span>
-                                </div>
                             </div>
-
-                            <div className="mt-4 pt-2">
+                            
+                            {/* FOOTER: Action Button */}
+                            <div style={{ marginTop: 'auto', paddingTop: '10px' }}>
                                 {isTeacherOrAdmin ? (
                                     <button 
                                         onClick={() => openGradingModal(tugas)}
-                                        className="w-full btn-primary text-sm py-2"
+                                        style={{
+                                            width: '100%',
+                                            padding: '12px',
+                                            borderRadius: '12px',
+                                            background: 'white',
+                                            border: '1px solid #22c55e',
+                                            color: '#22c55e',
+                                            fontWeight: '600',
+                                            fontSize: '0.9rem',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: '8px',
+                                            transition: 'all 0.2s'
+                                        }}
+                                        onMouseOver={(e) => {
+                                            e.currentTarget.style.background = '#22c55e';
+                                            e.currentTarget.style.color = 'white';
+                                            e.currentTarget.style.boxShadow = '0 6px 20px rgba(34, 197, 94, 0.25)';
+                                            e.currentTarget.style.transform = 'translateY(-2px)';
+                                        }}
+                                        onMouseOut={(e) => {
+                                            e.currentTarget.style.background = 'white';
+                                            e.currentTarget.style.color = '#22c55e';
+                                            e.currentTarget.style.boxShadow = 'none';
+                                            e.currentTarget.style.transform = 'translateY(0)';
+                                        }}
                                     >
-                                        👀 Lihat Pengumpulan
+                                        <span>📋</span> Lihat Pengumpulan
                                     </button>
                                 ) : (
-                                    <button 
-                                        onClick={() => openSubmitModal(tugas)}
-                                        className="w-full btn-primary text-sm py-2"
-                                        style={{ background: '#3b82f6', boxShadow:'0 4px 6px -1px rgba(59, 130, 246, 0.3)' }}
-                                    >
-                                        📤 Upload Jawaban
-                                    </button>
+                                    (() => {
+                                        const mySubmission = getMySubmissionFor(tugas.id);
+                                        if (mySubmission) {
+                                            // Already submitted - show checkmark + view button
+                                            return (
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                    <div style={{
+                                                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                                                        padding: '10px', background: '#dcfce7', borderRadius: '10px',
+                                                        color: '#16a34a', fontWeight: '600', fontSize: '0.85rem'
+                                                    }}>
+                                                        <span style={{ fontSize: '1.2rem' }}>✅</span>
+                                                        Sudah Dikumpulkan
+                                                        {mySubmission.grade !== null && (
+                                                            <span style={{
+                                                                background: mySubmission.grade >= 75 ? '#22c55e' : '#f59e0b',
+                                                                color: 'white', padding: '2px 8px', borderRadius: '6px',
+                                                                fontSize: '0.75rem', fontWeight: '700', marginLeft: '4px'
+                                                            }}>Nilai: {mySubmission.grade}</span>
+                                                        )}
+                                                    </div>
+                                                    <button 
+                                                        onClick={() => openViewSubmission(mySubmission)}
+                                                        style={{
+                                                            width: '100%',
+                                                            padding: '10px',
+                                                            borderRadius: '10px',
+                                                            background: 'white',
+                                                            border: '1px solid #94a3b8',
+                                                            color: '#475569',
+                                                            fontWeight: '600',
+                                                            fontSize: '0.85rem',
+                                                            cursor: 'pointer',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            gap: '6px',
+                                                            transition: 'all 0.2s'
+                                                        }}
+                                                        onMouseOver={(e) => {
+                                                            e.currentTarget.style.background = '#f1f5f9';
+                                                        }}
+                                                        onMouseOut={(e) => {
+                                                            e.currentTarget.style.background = 'white';
+                                                        }}
+                                                    >
+                                                        <span>👀</span> Lihat Jawaban Saya
+                                                    </button>
+                                                </div>
+                                            );
+                                        } else {
+                                            // Not submitted yet - show upload button
+                                            return (
+                                                <button 
+                                                    onClick={() => openSubmitModal(tugas)}
+                                                    style={{
+                                                        width: '100%',
+                                                        padding: '12px',
+                                                        borderRadius: '12px',
+                                                        background: 'white',
+                                                        border: '1px solid #3b82f6',
+                                                        color: '#3b82f6',
+                                                        fontWeight: '600',
+                                                        fontSize: '0.9rem',
+                                                        cursor: 'pointer',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        gap: '8px',
+                                                        transition: 'all 0.2s'
+                                                    }}
+                                                    onMouseOver={(e) => {
+                                                        e.currentTarget.style.background = '#3b82f6';
+                                                        e.currentTarget.style.color = 'white';
+                                                        e.currentTarget.style.boxShadow = '0 6px 20px rgba(59, 130, 246, 0.25)';
+                                                        e.currentTarget.style.transform = 'translateY(-2px)';
+                                                    }}
+                                                    onMouseOut={(e) => {
+                                                        e.currentTarget.style.background = 'white';
+                                                        e.currentTarget.style.color = '#3b82f6';
+                                                        e.currentTarget.style.boxShadow = 'none';
+                                                        e.currentTarget.style.transform = 'translateY(0)';
+                                                    }}
+                                                >
+                                                    <span>📤</span> Upload Jawaban
+                                                </button>
+                                            );
+                                        }
+                                    })()
                                 )}
                             </div>
                         </div>
@@ -484,34 +842,121 @@ const Assignments = () => {
 
             {/* Submission Modal */}
             {showSubmitModal && selectedTask && (
-                <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center backdrop-blur-sm">
-                    <div className="glass-card w-[500px] max-w-[95%] bg-white p-8 rounded-2xl shadow-2xl animate-slide-down">
-                        <div className="text-center mb-6">
-                            <h3 className="text-xl font-bold text-slate-800">Kumpulkan Tugas</h3>
-                            <p className="text-slate-500 text-sm mt-1">{selectedTask.title}</p>
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: 'rgba(15, 23, 42, 0.7)',
+                    backdropFilter: 'blur(4px)',
+                    zIndex: 9999,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '20px'
+                }}>
+                    <div style={{
+                        background: 'white',
+                        borderRadius: '20px',
+                        padding: '32px',
+                        width: '100%',
+                        maxWidth: '480px',
+                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                        animation: 'slideDown 0.3s ease-out'
+                    }}>
+                        {/* Header */}
+                        <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+                            <div style={{ 
+                                width: '60px', height: '60px', borderRadius: '16px',
+                                background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                margin: '0 auto 16px', fontSize: '28px'
+                            }}>📤</div>
+                            <h3 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#1e293b', margin: 0 }}>
+                                Kumpulkan Tugas
+                            </h3>
+                            <p style={{ fontSize: '0.875rem', color: '#64748b', marginTop: '4px' }}>
+                                {selectedTask.title}
+                            </p>
                         </div>
                         
                         <form onSubmit={handleSubmitAssignment}>
-                            <div className="mb-6 p-6 border-2 border-dashed border-slate-300 rounded-xl bg-slate-50 text-center hover:bg-white hover:border-blue-400 transition-colors">
-                                <div className="text-4xl mb-2">📁</div>
-                                <p className="text-sm font-bold text-slate-600 mb-2">Upload File Jawaban</p>
-                                <p className="text-xs text-slate-400 mb-4">PDF, DOCT, JPG (Max 20MB)</p>
+                            {/* Upload Area */}
+                            <div style={{
+                                border: '2px dashed #cbd5e1',
+                                borderRadius: '16px',
+                                padding: '32px 24px',
+                                textAlign: 'center',
+                                background: '#f8fafc',
+                                marginBottom: '24px',
+                                transition: 'all 0.2s'
+                            }}>
+                                <div style={{ fontSize: '40px', marginBottom: '12px' }}>📁</div>
+                                <p style={{ fontWeight: '600', color: '#475569', marginBottom: '4px' }}>
+                                    Upload File Jawaban
+                                </p>
+                                <p style={{ fontSize: '0.75rem', color: '#94a3b8', marginBottom: '16px' }}>
+                                    PDF, DOC, DOCX, JPG, PNG (Max 20MB)
+                                </p>
                                 <input 
                                     type="file" 
-                                    className="block w-full text-sm text-slate-500
-                                      file:mr-4 file:py-2 file:px-4
-                                      file:rounded-full file:border-0
-                                      file:text-sm file:font-semibold
-                                      file:bg-blue-50 file:text-blue-700
-                                      hover:file:bg-blue-100" 
                                     onChange={e => setSubmissionFile(e.target.files[0])}
                                     required
+                                    style={{
+                                        display: 'block',
+                                        width: '100%',
+                                        fontSize: '0.875rem',
+                                        color: '#64748b'
+                                    }}
                                 />
+                                {submissionFile && (
+                                    <p style={{ 
+                                        marginTop: '12px', 
+                                        fontSize: '0.875rem', 
+                                        color: '#22c55e',
+                                        fontWeight: '600'
+                                    }}>
+                                        ✅ {submissionFile.name}
+                                    </p>
+                                )}
                             </div>
                             
-                            <div className="flex gap-3">
-                                <button type="button" onClick={() => setShowSubmitModal(false)} className="btn-secondary flex-1 py-3">Batal</button>
-                                <button type="submit" className="btn-primary flex-1 py-3" disabled={uploading}>
+                            {/* Buttons */}
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                                <button 
+                                    type="button" 
+                                    onClick={() => setShowSubmitModal(false)}
+                                    style={{
+                                        flex: 1,
+                                        padding: '14px',
+                                        borderRadius: '12px',
+                                        border: '1px solid #e2e8f0',
+                                        background: 'white',
+                                        color: '#64748b',
+                                        fontWeight: '600',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s'
+                                    }}
+                                >
+                                    Batal
+                                </button>
+                                <button 
+                                    type="submit" 
+                                    disabled={uploading}
+                                    style={{
+                                        flex: 1,
+                                        padding: '14px',
+                                        borderRadius: '12px',
+                                        border: 'none',
+                                        background: uploading ? '#94a3b8' : 'linear-gradient(135deg, #22c55e, #16a34a)',
+                                        color: 'white',
+                                        fontWeight: '600',
+                                        cursor: uploading ? 'not-allowed' : 'pointer',
+                                        boxShadow: uploading ? 'none' : '0 4px 14px rgba(34, 197, 94, 0.35)',
+                                        transition: 'all 0.2s'
+                                    }}
+                                >
                                     {uploading ? '⏳ Mengirim...' : '🚀 Kirim Jawaban'}
                                 </button>
                             </div>
@@ -522,93 +967,360 @@ const Assignments = () => {
 
             {/* Grading Modal */}
             {showGradingModal && selectedTask && (
-                <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center backdrop-blur-sm">
-                    <div className="glass-card w-[800px] max-w-[95%] bg-white p-6 rounded-2xl shadow-2xl animate-slide-down max-h-[90vh] overflow-hidden flex flex-col">
-                        <div className="flex justify-between items-center mb-4">
-                            <div>
-                                <h3 className="text-xl font-bold text-slate-800">Daftar Pengumpulan</h3>
-                                <p className="text-slate-500 text-sm mt-1">{selectedTask.title} — {selectedTask.class_name}</p>
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: 'rgba(15, 23, 42, 0.7)',
+                    backdropFilter: 'blur(4px)',
+                    zIndex: 9999,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '20px'
+                }}>
+                    <div style={{
+                        background: 'white',
+                        borderRadius: '20px',
+                        padding: '24px',
+                        width: '100%',
+                        maxWidth: '800px',
+                        maxHeight: '85vh',
+                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        overflow: 'hidden'
+                    }}>
+                        {/* Header */}
+                        <div style={{ 
+                            display: 'flex', 
+                            justifyContent: 'space-between', 
+                            alignItems: 'center',
+                            marginBottom: '20px',
+                            paddingBottom: '16px',
+                            borderBottom: '1px solid #e2e8f0'
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                                <div style={{ 
+                                    width: '48px', height: '48px', borderRadius: '12px',
+                                    background: 'linear-gradient(135deg, #22c55e, #16a34a)',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    fontSize: '24px'
+                                }}>📋</div>
+                                <div>
+                                    <h3 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#1e293b', margin: 0 }}>
+                                        Daftar Pengumpulan
+                                    </h3>
+                                    <p style={{ fontSize: '0.875rem', color: '#64748b', margin: '4px 0 0 0' }}>
+                                        {selectedTask.title} — {selectedTask.class_name}
+                                    </p>
+                                </div>
                             </div>
-                            <button onClick={() => setShowGradingModal(false)} className="text-2xl text-slate-400 hover:text-slate-600">&times;</button>
+                            <button 
+                                onClick={() => setShowGradingModal(false)}
+                                style={{
+                                    width: '36px', height: '36px', borderRadius: '10px',
+                                    border: 'none', background: '#f1f5f9', color: '#64748b',
+                                    fontSize: '20px', cursor: 'pointer', display: 'flex',
+                                    alignItems: 'center', justifyContent: 'center',
+                                    transition: 'all 0.2s'
+                                }}
+                            >×</button>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto pr-2">
+                        {/* Content */}
+                        <div style={{ flex: 1, overflowY: 'auto', paddingRight: '8px' }}>
                             {loadingSubmissions ? (
-                                <div className="text-center py-10"><div className="spinner"></div></div>
+                                <div style={{ textAlign: 'center', padding: '40px' }}>
+                                    <div className="spinner"></div>
+                                </div>
                             ) : submissions.length === 0 ? (
-                                <div className="text-center py-12 bg-slate-50 rounded-xl border border-dashed text-slate-400">
-                                    Belum ada siswa yang mengumpulkan.
+                                <div style={{ 
+                                    textAlign: 'center', 
+                                    padding: '48px 24px', 
+                                    background: '#f8fafc', 
+                                    borderRadius: '16px',
+                                    border: '2px dashed #e2e8f0'
+                                }}>
+                                    <div style={{ fontSize: '48px', marginBottom: '12px' }}>📭</div>
+                                    <p style={{ color: '#94a3b8', fontWeight: '500' }}>
+                                        Belum ada siswa yang mengumpulkan.
+                                    </p>
                                 </div>
                             ) : (
-                                <table className="w-full text-left border-collapse">
-                                    <thead className="bg-slate-50 text-slate-600 text-xs uppercase tracking-wide sticky top-0">
-                                        <tr>
-                                            <th className="p-3 border-b">Nama Siswa</th>
-                                            <th className="p-3 border-b">Waktu Submit</th>
-                                            <th className="p-3 border-b">File</th>
-                                            <th className="p-3 border-b text-center">Nilai</th>
-                                            <th className="p-3 border-b text-right">Aksi</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="text-sm">
-                                        {submissions.map(sub => (
-                                            <tr key={sub.id} className="border-b hover:bg-slate-50">
-                                                <td className="p-3 font-semibold text-slate-700">{sub.student_name}</td>
-                                                <td className="p-3 text-slate-500">
-                                                    {new Date(sub.submitted_at + 'Z').toLocaleString('id-ID')}
-                                                </td>
-                                                <td className="p-3">
-                                                    <a href={sub.file_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-1">
-                                                        📄 Lihat
-                                                    </a>
-                                                </td>
-                                                <td className="p-3 text-center">
-                                                    {sub.grade !== null ? (
-                                                        <span className={`px-2 py-1 rounded font-bold ${sub.grade >= 75 ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                                                            {sub.grade}
-                                                        </span>
-                                                    ) : (
-                                                        <span className="text-slate-400">-</span>
-                                                    )}
-                                                </td>
-                                                <td className="p-3 text-right">
-                                                    {gradingId === sub.id ? (
-                                                        <div className="flex flex-col gap-2 min-w-[150px] bg-white p-2 shadow rounded absolute right-10 z-10 border border-slate-200 animate-fade-in">
-                                                            <input 
-                                                                type="number" className="form-control text-sm p-1" 
-                                                                placeholder="Nilai (0-100)" 
-                                                                value={gradeValue} onChange={e => setGradeValue(e.target.value)}
-                                                                min="0" max="100"
-                                                            />
-                                                            <input 
-                                                                type="text" className="form-control text-sm p-1" 
-                                                                placeholder="Feedback..." 
-                                                                value={feedbackValue} onChange={e => setFeedbackValue(e.target.value)}
-                                                            />
-                                                            <div className="flex gap-1 justify-end">
-                                                                <button onClick={() => setGradingId(null)} className="text-xs bg-slate-100 px-2 py-1 rounded">Batal</button>
-                                                                <button onClick={() => handleGrade(sub.id)} className="text-xs bg-green-500 text-white px-2 py-1 rounded">Simpan</button>
-                                                            </div>
-                                                        </div>
-                                                    ) : (
-                                                        <button 
-                                                            onClick={() => {
-                                                                setGradingId(sub.id);
-                                                                setGradeValue(sub.grade || '');
-                                                                setFeedbackValue(sub.feedback || '');
-                                                            }}
-                                                            className="text-xs font-bold text-slate-600 bg-slate-200 px-3 py-1.5 rounded hover:bg-slate-300 transition-colors"
-                                                        >
-                                                            {sub.grade ? 'Edit Nilai' : 'Beri Nilai'}
-                                                        </button>
-                                                    )}
-                                                </td>
+                                <div style={{ 
+                                    background: '#f8fafc', 
+                                    borderRadius: '12px', 
+                                    overflow: 'hidden',
+                                    border: '1px solid #e2e8f0'
+                                }}>
+                                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                        <thead>
+                                            <tr style={{ background: '#f1f5f9' }}>
+                                                <th style={{ padding: '14px 16px', textAlign: 'left', fontSize: '0.75rem', fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Nama Siswa</th>
+                                                <th style={{ padding: '14px 16px', textAlign: 'left', fontSize: '0.75rem', fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Waktu Submit</th>
+                                                <th style={{ padding: '14px 16px', textAlign: 'left', fontSize: '0.75rem', fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px' }}>File</th>
+                                                <th style={{ padding: '14px 16px', textAlign: 'center', fontSize: '0.75rem', fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Nilai</th>
+                                                <th style={{ padding: '14px 16px', textAlign: 'right', fontSize: '0.75rem', fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Aksi</th>
                                             </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                                        </thead>
+                                        <tbody>
+                                            {submissions.map((sub, idx) => (
+                                                <tr key={sub.id} style={{ 
+                                                    background: idx % 2 === 0 ? 'white' : '#fafafa',
+                                                    borderBottom: '1px solid #f1f5f9'
+                                                }}>
+                                                    <td style={{ padding: '14px 16px' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                            <div style={{
+                                                                width: '32px', height: '32px', borderRadius: '8px',
+                                                                background: '#dbeafe', color: '#3b82f6',
+                                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                                fontSize: '14px', fontWeight: '600'
+                                                            }}>
+                                                                {sub.student_name.charAt(0).toUpperCase()}
+                                                            </div>
+                                                            <span style={{ fontWeight: '600', color: '#1e293b' }}>{sub.student_name}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td style={{ padding: '14px 16px', color: '#64748b', fontSize: '0.875rem' }}>
+                                                        {new Date(sub.submitted_at + 'Z').toLocaleString('id-ID')}
+                                                    </td>
+                                                    <td style={{ padding: '14px 16px' }}>
+                                                        <a 
+                                                            href={sub.file_url} 
+                                                            target="_blank" 
+                                                            rel="noopener noreferrer"
+                                                            style={{
+                                                                display: 'inline-flex', alignItems: 'center', gap: '6px',
+                                                                padding: '6px 12px', borderRadius: '8px',
+                                                                background: '#eff6ff', color: '#3b82f6',
+                                                                fontSize: '0.875rem', fontWeight: '500',
+                                                                textDecoration: 'none'
+                                                            }}
+                                                        >📄 Lihat</a>
+                                                    </td>
+                                                    <td style={{ padding: '14px 16px', textAlign: 'center' }}>
+                                                        {sub.grade !== null ? (
+                                                            <span style={{
+                                                                padding: '6px 12px', borderRadius: '8px',
+                                                                fontWeight: '700', fontSize: '0.875rem',
+                                                                background: sub.grade >= 75 ? '#dcfce7' : '#fef3c7',
+                                                                color: sub.grade >= 75 ? '#16a34a' : '#d97706'
+                                                            }}>{sub.grade}</span>
+                                                        ) : (
+                                                            <span style={{ color: '#cbd5e1' }}>—</span>
+                                                        )}
+                                                    </td>
+                                                    <td style={{ padding: '14px 16px', textAlign: 'right', position: 'relative' }}>
+                                                        {gradingId === sub.id ? (
+                                                            <div style={{
+                                                                position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)',
+                                                                background: 'white', padding: '16px', borderRadius: '12px',
+                                                                boxShadow: '0 10px 40px rgba(0,0,0,0.15)', border: '1px solid #e2e8f0',
+                                                                minWidth: '200px', zIndex: 10
+                                                            }}>
+                                                            <form onSubmit={(e) => { e.preventDefault(); handleGrade(sub.id); }}>
+                                                                <input 
+                                                                    type="number" 
+                                                                    placeholder="Nilai (0-100)" 
+                                                                    value={gradeValue} 
+                                                                    onChange={e => setGradeValue(e.target.value)}
+                                                                    min="0" max="100"
+                                                                    autoFocus
+                                                                    style={{
+                                                                        width: '100%', padding: '10px 12px', borderRadius: '8px',
+                                                                        border: '1px solid #e2e8f0', fontSize: '0.875rem',
+                                                                        marginBottom: '8px'
+                                                                    }}
+                                                                />
+                                                                <input 
+                                                                    type="text" 
+                                                                    placeholder="Feedback (opsional)" 
+                                                                    value={feedbackValue} 
+                                                                    onChange={e => setFeedbackValue(e.target.value)}
+                                                                    style={{
+                                                                        width: '100%', padding: '10px 12px', borderRadius: '8px',
+                                                                        border: '1px solid #e2e8f0', fontSize: '0.875rem',
+                                                                        marginBottom: '12px'
+                                                                    }}
+                                                                />
+                                                                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                                                                    <button 
+                                                                        type="button"
+                                                                        onClick={() => setGradingId(null)}
+                                                                        style={{
+                                                                            padding: '8px 14px', borderRadius: '8px',
+                                                                            border: '1px solid #e2e8f0', background: 'white',
+                                                                            color: '#64748b', fontSize: '0.8rem', fontWeight: '600',
+                                                                            cursor: 'pointer'
+                                                                        }}
+                                                                    >Batal</button>
+                                                                    <button 
+                                                                        type="submit"
+                                                                        style={{
+                                                                            padding: '8px 14px', borderRadius: '8px',
+                                                                            border: 'none', background: '#22c55e',
+                                                                            color: 'white', fontSize: '0.8rem', fontWeight: '600',
+                                                                            cursor: 'pointer'
+                                                                        }}
+                                                                    >Simpan</button>
+                                                                </div>
+                                                            </form>
+                                                            </div>
+                                                        ) : (
+                                                            <button 
+                                                                onClick={() => {
+                                                                    setGradingId(sub.id);
+                                                                    setGradeValue(sub.grade || '');
+                                                                    setFeedbackValue(sub.feedback || '');
+                                                                }}
+                                                                style={{
+                                                                    padding: '8px 16px', borderRadius: '8px',
+                                                                    border: 'none', 
+                                                                    background: sub.grade ? '#f1f5f9' : 'linear-gradient(135deg, #22c55e, #16a34a)',
+                                                                    color: sub.grade ? '#475569' : 'white',
+                                                                    fontSize: '0.8rem', fontWeight: '600',
+                                                                    cursor: 'pointer',
+                                                                    boxShadow: sub.grade ? 'none' : '0 2px 8px rgba(34, 197, 94, 0.3)'
+                                                                }}
+                                                            >
+                                                                {sub.grade ? '✏️ Edit' : '⭐ Beri Nilai'}
+                                                            </button>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
                             )}
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* View My Submission Modal (Student) */}
+            {showViewModal && viewingSubmission && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: 'rgba(15, 23, 42, 0.7)',
+                    backdropFilter: 'blur(4px)',
+                    zIndex: 9999,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '20px'
+                }}>
+                    <div style={{
+                        background: 'white',
+                        borderRadius: '20px',
+                        padding: '32px',
+                        width: '100%',
+                        maxWidth: '500px',
+                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+                    }}>
+                        {/* Header */}
+                        <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+                            <div style={{ 
+                                width: '60px', height: '60px', borderRadius: '16px',
+                                background: 'linear-gradient(135deg, #22c55e, #16a34a)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                margin: '0 auto 16px', fontSize: '28px'
+                            }}>✅</div>
+                            <h3 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#1e293b', margin: 0 }}>
+                                Jawaban Terkirim
+                            </h3>
+                        </div>
+                        
+                        {/* Submission Details */}
+                        <div style={{ 
+                            background: '#f8fafc', 
+                            borderRadius: '12px', 
+                            padding: '20px',
+                            marginBottom: '20px'
+                        }}>
+                            <div style={{ marginBottom: '16px' }}>
+                                <p style={{ fontSize: '0.75rem', color: '#94a3b8', marginBottom: '4px', textTransform: 'uppercase', fontWeight: '600' }}>
+                                    Waktu Kirim
+                                </p>
+                                <p style={{ fontSize: '0.9rem', color: '#1e293b', fontWeight: '500', margin: 0 }}>
+                                    {new Date(viewingSubmission.submitted_at + 'Z').toLocaleString('id-ID')}
+                                </p>
+                            </div>
+                            
+                            <div style={{ marginBottom: '16px' }}>
+                                <p style={{ fontSize: '0.75rem', color: '#94a3b8', marginBottom: '4px', textTransform: 'uppercase', fontWeight: '600' }}>
+                                    File Jawaban
+                                </p>
+                                <a 
+                                    href={viewingSubmission.file_url} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    style={{
+                                        display: 'inline-flex', alignItems: 'center', gap: '8px',
+                                        padding: '10px 16px', borderRadius: '10px',
+                                        background: '#eff6ff', color: '#3b82f6',
+                                        fontSize: '0.9rem', fontWeight: '600',
+                                        textDecoration: 'none'
+                                    }}
+                                >📄 Lihat/Download File</a>
+                            </div>
+                            
+                            {viewingSubmission.grade !== null && (
+                                <div style={{ marginBottom: '16px' }}>
+                                    <p style={{ fontSize: '0.75rem', color: '#94a3b8', marginBottom: '4px', textTransform: 'uppercase', fontWeight: '600' }}>
+                                        Nilai
+                                    </p>
+                                    <span style={{
+                                        display: 'inline-block',
+                                        padding: '8px 16px', borderRadius: '10px',
+                                        background: viewingSubmission.grade >= 75 ? '#dcfce7' : '#fef3c7',
+                                        color: viewingSubmission.grade >= 75 ? '#16a34a' : '#d97706',
+                                        fontSize: '1.5rem', fontWeight: '700'
+                                    }}>{viewingSubmission.grade}</span>
+                                </div>
+                            )}
+                            
+                            {viewingSubmission.feedback && (
+                                <div>
+                                    <p style={{ fontSize: '0.75rem', color: '#94a3b8', marginBottom: '4px', textTransform: 'uppercase', fontWeight: '600' }}>
+                                        Feedback Guru
+                                    </p>
+                                    <p style={{ 
+                                        fontSize: '0.9rem', color: '#475569', margin: 0,
+                                        background: 'white', padding: '12px', borderRadius: '8px',
+                                        border: '1px solid #e2e8f0', lineHeight: '1.5'
+                                    }}>
+                                        {viewingSubmission.feedback}
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                        
+                        {/* Close Button */}
+                        <button 
+                            onClick={() => setShowViewModal(false)}
+                            style={{
+                                width: '100%',
+                                padding: '14px',
+                                borderRadius: '12px',
+                                border: 'none',
+                                background: '#f1f5f9',
+                                color: '#475569',
+                                fontWeight: '600',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s'
+                            }}
+                        >
+                            Tutup
+                        </button>
                     </div>
                 </div>
             )}

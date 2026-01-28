@@ -102,6 +102,31 @@ async def upload_submission(
         feedback=submission.feedback
     )
 
+@router.get("/my", response_model=List[SubmissionRead])
+def get_my_submissions(
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Get all submissions for the current student"""
+    submissions = session.exec(
+        select(Submission)
+        .where(Submission.student_id == current_user.id)
+        .options(selectinload(Submission.student))
+    ).all()
+    
+    return [
+        SubmissionRead(
+            id=s.id,
+            assignment_id=s.assignment_id,
+            student_id=s.student_id,
+            student_name=s.student.name if s.student else "Unknown",
+            file_url=s.file_url,
+            submitted_at=s.submitted_at,
+            grade=s.grade,
+            feedback=s.feedback
+        ) for s in submissions
+    ]
+
 @router.get("/assignment/{assignment_id}", response_model=List[SubmissionRead])
 def get_submissions_by_assignment(
     assignment_id: int,

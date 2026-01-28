@@ -41,18 +41,24 @@ const Login = () => {
             const { access_token } = response.data;
             localStorage.setItem('token', access_token);
             
-            // Check if profile is complete
-            const profileRes = await axios.get('/myprofile', {
-                headers: { Authorization: `Bearer ${access_token}` }
-            });
-            
-            if (!profileRes.data.is_profile_complete) {
-                toast.info("Silakan lengkapi profil Anda terlebih dahulu.");
-                navigate('/complete-profile');
-            } else {
-                toast.success("Login Berhasil! Selamat datang.");
-                navigate('/dashboard');
+            // Check if profile is complete (with fallback)
+            try {
+                const profileRes = await axios.get('/myprofile', {
+                    headers: { Authorization: `Bearer ${access_token}` }
+                });
+                
+                if (!profileRes.data.is_profile_complete) {
+                    toast.info("Silakan lengkapi profil Anda terlebih dahulu.");
+                    window.location.href = '/complete-profile';
+                    return;
+                }
+            } catch (profileErr) {
+                console.warn("Profile check failed, proceeding to dashboard:", profileErr);
             }
+            
+            // Default: Navigate to dashboard
+            toast.success("Login Berhasil! Selamat datang.");
+            window.location.href = '/dashboard';
 
         } catch (err) {
             console.error(err);

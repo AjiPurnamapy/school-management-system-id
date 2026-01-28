@@ -303,7 +303,11 @@ const Schedules = () => {
                      <h2 className="mb-1" style={{ fontSize: '2rem', fontWeight: '800', color: '#1e293b' }}>
                         Jadwal Pelajaran 🗓️
                      </h2>
-                     <p className="text-muted m-0">Atur jadwal mingguan per kelas.</p>
+                     <p className="text-muted m-0">
+                         {currentUser?.role === 'student' 
+                             ? 'Lihat jadwal pelajaran kelasmu.' 
+                             : 'Atur jadwal mingguan per kelas.'}
+                     </p>
                 </div>
                 {/* Action Button: Always Visible for better UX */}
                 {/* Action Button: Only for Admin & Principal */}

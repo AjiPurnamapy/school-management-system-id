@@ -31,6 +31,11 @@ async def send_verification_email(email_to: EmailStr, username: str, token: str)
     # link ini mengarah ke endpoint verify dan pastikan apakah main.py memiliki prefix atau tidak (ini tanpa prefix)
     verification_link = f"{DOMAIN or 'http://localhost:8000'}/verify?token={token}"
 
+    # SKIP email saat testing
+    if os.getenv("TESTING") == "true":
+        print(f"[TEST MODE] Skipping verification email to {email_to}")
+        return
+
     if not conf:
         print(f"=======================================")
         print(f"[MOCK EMAIL] ACTIVATION")
@@ -122,6 +127,11 @@ async def send_reset_password_email(email_to: EmailStr, token: str):
     # Gunakan FRONTEND_URL dari environment untuk fleksibilitas deployment
     frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
     reset_link = f"{frontend_url}/reset?token={token}"
+
+    # SKIP email saat testing
+    if os.getenv("TESTING") == "true":
+        print(f"[TEST MODE] Skipping reset password email to {email_to}")
+        return
 
     if not conf:
         print(f"=======================================")

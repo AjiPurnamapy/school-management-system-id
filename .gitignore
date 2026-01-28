@@ -19,6 +19,9 @@ env/
 # Folder Static (Gambar User)
 backend/static/images/
 backend/static/files/
+backend/static/submissions/
+backend/static/assignments/
+backend/static/materials/
 backup/
 
 # NODE / FRONTEND

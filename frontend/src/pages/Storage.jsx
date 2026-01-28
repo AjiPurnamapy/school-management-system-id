@@ -8,13 +8,27 @@ const Storage = () => {
     const [loading, setLoading] = useState(true);
     const [uploading, setUploading] = useState(false);
     const [error, setError] = useState('');
+    const [currentUser, setCurrentUser] = useState(null);
     const { toast } = useToast();
     const { confirm } = useConfirm();
 
     // Fetch Files saat komponen di-load
     useEffect(() => {
         fetchFiles();
+        fetchCurrentUser();
     }, []);
+
+    const fetchCurrentUser = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const res = await axios.get('/myprofile', {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setCurrentUser(res.data);
+        } catch (err) {
+            console.error('Gagal ambil profile:', err);
+        }
+    };
 
     const fetchFiles = async () => {
         try {
@@ -110,7 +124,11 @@ const Storage = () => {
                      <h2 className="mb-1" style={{ fontSize: '2rem', fontWeight: '800', color: '#1e293b' }}>
                         Cloud Storage ☁️
                      </h2>
-                     <p className="text-muted m-0">Simpan dan bagikan materi pembelajaran.</p>
+                     <p className="text-muted m-0">
+                         {currentUser?.role === 'student' 
+                             ? 'Simpan file pribadi kamu di sini.' 
+                             : 'Simpan dan bagikan materi pembelajaran.'}
+                     </p>
                 </div>
                 
                 <div className="upload-btn-wrapper">
@@ -149,7 +167,11 @@ const Storage = () => {
                 <div className="text-center py-20 px-6 bg-slate-50 rounded-2xl border border-dashed border-slate-300">
                     <div style={{ fontSize: '4rem', marginBottom: '15px', color: '#cbd5e1' }}>📭</div>
                     <p className="text-slate-500 text-lg font-medium">Belum ada file tersimpan.</p>
-                    <p className="text-slate-400 text-sm">Upload materi agar siswa bisa mengaksesnya.</p>
+                    <p className="text-slate-400 text-sm">
+                        {currentUser?.role === 'student' 
+                            ? 'Upload file tugas atau catatan pribadimu.' 
+                            : 'Upload materi agar siswa bisa mengaksesnya.'}
+                    </p>
                 </div>
             ) : (
                 <div className="file-grid animate-fade-in" style={{ 

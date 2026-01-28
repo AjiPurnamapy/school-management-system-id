@@ -94,7 +94,11 @@ const Subjects = () => {
             <div className="flex-between align-center mb-5">
                 <div>
                     <h2 className="mb-1" style={{ fontSize: '1.75rem', fontWeight: '800', color: '#1e293b', letterSpacing: '-0.025em' }}>Mata Pelajaran 📚</h2>
-                    <p className="text-muted m-0" style={{fontSize: '1rem'}}>Kelola daftar mata pelajaran sekolah.</p>
+                    <p className="text-muted m-0" style={{fontSize: '1rem'}}>
+                        {currentUser?.role === 'student' 
+                            ? 'Daftar mata pelajaran yang kamu ikuti.' 
+                            : 'Kelola daftar mata pelajaran sekolah.'}
+                    </p>
                 </div>
                 {/* Action Button */}
                 {(currentUser?.role === 'admin' || currentUser?.role === 'principal') && (

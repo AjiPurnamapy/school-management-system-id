@@ -1,33 +1,22 @@
 import logging
-import shutil    # shutil: Untuk menyalin file (copy file)
-import uuid     # uuid: Untuk membuat nama file acak yang unik (agar tidak bentrok)
 import os
-
-from fastapi import UploadFile, File    # UploadFile, File: Tipe data khusus dari FastAPI untuk menangkap file upload
-from fastapi import APIRouter, Depends, HTTPException, status, Request, BackgroundTasks
+from fastapi import UploadFile, File, APIRouter, Depends, status, Request, BackgroundTasks, HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
-from sqlmodel import Session, select, or_
-from jose import jwt, JWTError
-from fastapi.responses import HTMLResponse, RedirectResponse # Import RedirectResponse
-from sqlalchemy.exc import IntegrityError
-from backend.database import get_session
+from sqlmodel import Session
+from fastapi.responses import HTMLResponse, RedirectResponse
 
-# ... (imports lainnya tetap sama, jangan dihapus) 
+from backend.database import get_session
 from backend.schemas.user import ForgotPasswordRequest, ResetPasswordRequest
 from backend.schemas.user import UserCreate, UserRead, ProfileCompleteSchema
 from backend.schemas.token import Token
 from backend.models import User
 from backend.limiter import limiter
-from backend.mail_service import send_verification_email, send_reset_password_email
-from backend.utils.templates import get_error_html, get_success_html
-from backend.dependencies import (
-    get_password_hash,
-    verify_password,
-    create_access_token,
-    get_current_user,
-    ALGORITHM,
-    SECRET_KEY
-)
+from backend.utils.templates import get_error_html
+from backend.dependencies import get_current_user
+
+# Import Services
+from backend.services.auth_service import auth_service
+from backend.services.file_service import file_service
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -38,109 +27,27 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 router = APIRouter(tags=["Authentication"])
 
 @router.post("/register", response_model=UserRead)
-@limiter.limit("3/minute")  # SECURITY: Mencegah spam registrasi
+@limiter.limit("3/hour")
+@limiter.limit("5/day")
 def create_user(
-    request: Request,  # Diperlukan oleh limiter
+    request: Request,
     user_input: UserCreate,
     background_tasks: BackgroundTasks,
     session: Session = Depends(get_session),
 ):
-    # konversi dari UserCreate (schema) ke User (model database)
-    user_db = User.model_validate(user_input)
-    # hash password dan timpa password asli dengan yang sudah diacak
-    user_db.password = get_password_hash(user_input.password)
-    user_db.is_active = False
+    return auth_service.register_user(session, user_input, background_tasks)
 
-    try:
-        session.add(user_db)        # menyimpan data ke memori python
-        session.commit()            # mengirim datanya ke database
-        session.refresh(user_db)    # mengambil data yang tadi dari database
-
-        # buat token verifikasi (beda dengan token login)
-        verify_token = create_access_token(
-            data={"sub": user_db.email, "type" : "email_verification"}
-        )
-
-        # kirim email (sekarang sudah aktif!)
-        background_tasks.add_task(
-            send_verification_email,
-            user_db.email,
-            user_db.name,
-            verify_token
-        )
-        logger.info(f"New user registered: {user_db.name} ({user_db.email})")
-        return user_db              
-    
-    except IntegrityError:
-        session.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username atau Email sudah terdaftar"
-        )
-    
-    except Exception as e:
-        session.rollback()
-        logger.error(f"Error registration: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Terjadi kesalahan pada sistem"
-        )
-
-# endpoint khusus verifikasi
 @router.get("/verify")
 def verify_email(token: str, session: Session = Depends(get_session)):
     try:
-        # Deskripsi token
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email = payload.get("sub")
-        token_type = payload.get("type")
-
-        # validasi token type untuk keamanan
-        if email is None or token_type != "email_verification":
-            logger.warning("Invalid Verification token attemted")
-            return HTMLResponse(
-                content= get_error_html ("Token tidak valid"),
-                status_code=status.HTTP_400_BAD_REQUEST
-            )
-    except JWTError as e:
-        logger.warning(f"JWT error during verification: {str(e)}")
-        return HTMLResponse(
-            content= get_error_html ("Token Kadaluarsa atau rusak"),
-            status_code=status.HTTP_400_BAD_REQUEST
-        )
-    
-    # cari user berdasarkan email dari token
-    statement = select(User).where(User.email == email)
-    user = session.exec(statement).first()
-
-    if not user:
-        logger.warning(f"Verification attemted for non-existent email: {email}")
-        return HTMLResponse(
-            content= get_error_html("User tidak ditemukan"),
-            status_code=status.HTTP_404_NOT_FOUND
-        )
-    
-    # cek apakah user sudah aktif sebelumnya
-    if user.is_active:
-        logger.info(f"User already verified: {user.email}")
-        # REDIRECT KE FRONTEND (Root URL karena Login ada di /)
-        return RedirectResponse(f"{FRONTEND_URL}/?verified=true", status_code=302)
-
-    try:
-        user.is_active = True
-        session.add(user)
-        session.commit()
+        user = auth_service.verify_email(session, token)
         logger.info(f"User verified successfully: {user.email}")
-
-        # REDIRECT KE FRONTEND (Root URL)
         return RedirectResponse(f"{FRONTEND_URL}/?verified=true", status_code=302)
-        
     except Exception as e:
-        session.rollback()
-        logger.error(f"Error activating user {email} : {str(e)}")
+        logger.error(f"Verification Error: {e}")
         return HTMLResponse(
-            content= get_error_html("Terjadi kesalahan sistem"),
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            content=get_error_html(str(e.detail) if hasattr(e, 'detail') else "Terjadi kesalahan"),
+            status_code=status.HTTP_400_BAD_REQUEST
         )
 
 @router.post("/token", response_model=Token)
@@ -150,64 +57,49 @@ def login_for_access_token(
     form_data: OAuth2PasswordRequestForm = Depends(),
     session: Session = Depends(get_session)
     ):
-    # LOGIC: DUKUNG LOGIN VIA EMAIL ATAU USERNAME
-    # Kita cari user yang namanya cocok ATAU emailnya cocok dengan input
+    from sqlmodel import select, or_
+    from backend.models import User
+    from backend.dependencies import verify_password, create_access_token
+    
+    # Find User by Name OR Email
     statement = select(User).where(
         or_(User.name == form_data.username, User.email == form_data.username)
     )
     user = session.exec(statement).first()
-    
-    # cek user ada atau tidak, cek password cocok atau tidak
+
+    # Verify Creds
     if not user or not verify_password(form_data.password, user.password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Username atau password salah",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
-    # cek apakah user sudah terverifikasi
+
+    # Check Active
     if not user.is_active:
-        logger.warning(f"Unverified user attemted login : {user.name}")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Email Belum Terverifikasi. Cek inbox email kamu sekarang juga untuk aktivasi"
+            detail="Email Belum Terverifikasi. Cek inbox email kamu untuk aktivasi"
         )
-    # jika lolos, buatkan token dengan type identifier
-    access_token = create_access_token(
-        data={"sub": user.name, "type":"access"}
-    )
-    logger.info(f"User Logged in successfully: {user.name}")
-    return {"access_token": access_token, "token_type": "bearer"}
 
-# endpoint khusus data pribadi user
+    # Generate Token
+    access_token = create_access_token(
+        data={"sub": user.name, "type": "access"}
+    )
+    
+    return Token(access_token=access_token, token_type="bearer")
+
 @router.get("/myprofile", response_model=UserRead)
 def check_my_profile(current_user : User = Depends(get_current_user)):
     return current_user
 
-# Endpoint untuk melengkapi profil setelah registrasi
 @router.put("/complete-profile", response_model=UserRead)
 def complete_profile(
     profile_data: ProfileCompleteSchema,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):
-    """
-    Endpoint untuk user (siswa/guru) melengkapi profil setelah registrasi.
-    Wajib diisi: NIS/NIP, alamat, nomor HP, tanggal lahir.
-    """
-    # Update field profil
-    current_user.nis = profile_data.nis
-    current_user.address = profile_data.address
-    current_user.phone = profile_data.phone
-    current_user.birth_date = profile_data.birth_date
-    current_user.is_profile_complete = True
-    
-    session.add(current_user)
-    session.commit()
-    session.refresh(current_user)
-    
-    return current_user
-
+    return auth_service.complete_profile(session, current_user, profile_data)
 
 @router.post("/upload-photo")
 async def upload_photo(
@@ -215,40 +107,19 @@ async def upload_photo(
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):
-    # Konstanta: Maksimal 2MB untuk foto profil
-    MAX_PHOTO_SIZE = 2 * 1024 * 1024  # 2MB
-    
-    # 1. VALIDASI: Pastikan file benar-benar gambar
-    if file.content_type not in ["image/jpeg", "image/png"]:
-        raise HTTPException(status_code=400, detail="Hanya boleh file JPG atau PNG")
-    
-    # 2. VALIDASI: Cek ukuran file (jika header tersedia)
-    if file.size and file.size > MAX_PHOTO_SIZE:
-        raise HTTPException(
-            status_code=400, 
-            detail=f"Ukuran foto terlalu besar. Maksimal {MAX_PHOTO_SIZE // (1024 * 1024)}MB."
-        )
-    
-    # Jika 1000 user upload file bernama "foto.jpg", file lama akan tertimpa.
-    # Solusinya: Kita ganti namanya dengan kode acak (UUID).
-    # Contoh: "1_a62f8... .jpg"
-    file_extension = file.filename.split(".")[-1]
-    unique_filename = f"{current_user.id}_{uuid.uuid4()}.{file_extension}"
-    file_location = f"backend/static/images/{unique_filename}"
-    
-    # SIMPAN FILE FISIK (Writing to Disk)
-    # File dari frontend datang berupa aliran data (stream).
-    # Kita harus menulis aliran tersebut ke file kosong di harddisk server.
-    try:
-        with open(file_location, "wb+") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Gagal menyimpan file: {str(e)}")
-        
-    # UPDATE DATABASE (Saving the Path)
-    # Penting: Database TIDAK menyimpan gambar karena akan berat.
-    # Database hanya menyimpan "Alamat/Lokasi" gambar tersebut.
-    image_url = f"/static/images/{unique_filename}"
+    # Using FileService
+    # Remove old file if exists (optional logic, but good practice)
+    if current_user.profile_image:
+        file_service.delete_file(current_user.profile_image)
+
+    # Save new file
+    # Allowed: jpg, png. Max 2MB
+    image_url = await file_service.save_file(
+        file, 
+        folder="images", 
+        allowed_extensions={"jpg", "jpeg", "png"}, 
+        max_size_mb=2
+    )
     
     current_user.profile_image = image_url
     session.add(current_user)
@@ -257,64 +128,22 @@ async def upload_photo(
     
     return {"filename": file.filename, "url": image_url}
 
-
-# FORGOT PASSWORD (REAL EMAIL)
 @router.post("/forgot-password")
-@limiter.limit("3/minute")  # SECURITY: Mencegah spam email reset password
+@limiter.limit("2/hour")
+@limiter.limit("5/day")
 def forgot_password(
-    request: Request,  # Diperlukan oleh limiter
+    request: Request,
     data: ForgotPasswordRequest,
     background_tasks: BackgroundTasks,
     session: Session = Depends(get_session)
 ):
-    # 1. Cari user
-    statement = select(User).where(User.email == data.email)
-    user = session.exec(statement).first()
-    
-    # 2. Jika user tidak ketemu, return 404
-    if not user:
-        raise HTTPException(status_code=404, detail="Email tidak terdaftar")
-    
-    # 3. Buat Token Khusus Reset Password
-    reset_token = create_access_token(
-        data={"sub": user.email, "type": "reset_password"} 
-    )
-    
-    # 4. Kirim Email RESET PASSWORD
-    background_tasks.add_task(send_reset_password_email, user.email, reset_token)
-    
+    auth_service.forgot_password_request(session, data.email, background_tasks)
     return {"message": "Link reset password telah dikirim ke email."}
-
 
 @router.post("/reset-password")
 def reset_password(
     request: ResetPasswordRequest,
     session: Session = Depends(get_session)
 ):
-    try:
-        # 1. Decode Token
-        payload = jwt.decode(request.token, SECRET_KEY, algorithms=[ALGORITHM])
-        email = payload.get("sub")
-        token_type = payload.get("type")
-        
-        # 2. Validasi Tipe Token
-        if token_type != "reset_password":
-            raise HTTPException(status_code=400, detail="Token tidak valid untuk reset password")
-            
-    except JWTError:
-        raise HTTPException(status_code=400, detail="Token Kadaluarsa atau rusak")
-        
-    # 3. Cari User
-    statement = select(User).where(User.email == email)
-    user = session.exec(statement).first()
-    
-    if not user:
-        raise HTTPException(status_code=404, detail="User tidak ditemukan")
-        
-    # 4. Ganti Password
-    # Jangan lupa hash password baru!
-    user.password = get_password_hash(request.new_password)
-    session.add(user)
-    session.commit()
-    
+    auth_service.reset_password_confirm(session, request.token, request.new_password)
     return {"message": "Password berhasil diubah! Silahkan login dengan password baru."}

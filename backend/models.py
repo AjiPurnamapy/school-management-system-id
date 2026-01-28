@@ -240,3 +240,56 @@ class Submission(SQLModel, table=True):
     # Relationships
     assignment: Optional["Assignment"] = Relationship(back_populates="submissions")
     student: Optional["User"] = Relationship()
+
+
+# ============================================================================
+# ATTENDANCE MODEL (Absensi Siswa)
+# ============================================================================
+
+class AttendanceStatus(str, Enum):
+    """Status kehadiran siswa."""
+    HADIR = "hadir"
+    IZIN = "izin"
+    SAKIT = "sakit"
+    ALFA = "alfa"  # Tanpa keterangan
+
+
+class Attendance(SQLModel, table=True):
+    """
+    Catatan kehadiran siswa per pertemuan/jadwal.
+    
+    Index Strategy:
+    - idx_attendance_schedule_date: Untuk query absensi per jadwal per tanggal
+    - idx_attendance_student_date: Untuk rekap absensi siswa
+    """
+    __table_args__ = (
+        # Composite index untuk query absensi per jadwal per tanggal
+        Index('idx_attendance_schedule_date', 'schedule_id', 'date'),
+        # Index untuk rekap absensi per siswa
+        Index('idx_attendance_student_date', 'student_id', 'date'),
+        {"comment": "Attendance table for tracking student presence"},
+    )
+    
+    id: Optional[int] = Field(default=None, primary_key=True)
+    
+    # Context
+    schedule_id: int = Field(foreign_key="schedule.id", index=True)  # Jadwal pelajaran
+    student_id: int = Field(foreign_key="user.id", index=True)       # Siswa
+    
+    # Attendance Data
+    date: str = Field(max_length=10, index=True)  # Format: YYYY-MM-DD
+    status: AttendanceStatus = Field(default=AttendanceStatus.HADIR)
+    notes: Optional[str] = Field(default=None, max_length=500)  # Catatan (alasan izin/sakit)
+    
+    # Metadata
+    recorded_by: int = Field(foreign_key="user.id")  # Guru yang mencatat
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    # Relationships
+    schedule: Optional["Schedule"] = Relationship()
+    student: Optional["User"] = Relationship(
+        sa_relationship_kwargs={"foreign_keys": "[Attendance.student_id]"}
+    )
+    recorder: Optional["User"] = Relationship(
+        sa_relationship_kwargs={"foreign_keys": "[Attendance.recorded_by]"}
+    )
